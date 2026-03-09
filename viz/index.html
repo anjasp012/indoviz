@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>geovizwiz</title>
+  <link rel="icon" href="data:,">
+  <script>
+    // Clean up URL: remove index.html for a tidier look
+    if (window.location.pathname.endsWith('/index.html')) {
+        const newPath = window.location.pathname.replace(/\/index\.html$/, '/');
+        window.history.replaceState(null, '', newPath + window.location.search + window.location.hash);
+    }
+  </script>
+  <style>
+    :root { --panel:#fff; --shadow:0 6px 24px rgba(0,0,0,.12); --gap:10px; }
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body, #app { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
+    #map { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+
+    .window-header:hover {
+      background: rgba(240, 240, 240, 0.9);
+    }
+
+    #controls fieldset,
+    #paintControls fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+    #controls label,
+    #paintControls label { display:block; font-size: 12px; color: #333; }
+    #controls select,
+    #controls input[type="number"],
+    #controls input[type="text"],
+    #paintControls select,
+    #paintControls input[type="number"],
+    #paintControls input[type="text"] {
+      width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px;
+    }
+
+    #controls .row,
+    #paintControls .row {
+      display: grid;
+      grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+      gap: var(--gap);
+      align-items: end;
+    }
+    #controls .row > *,
+    #paintControls .row > * { min-width: 0; }
+
+    #controls .buttons,
+    #paintControls .buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+    #controls button,
+    #paintControls button {
+      border: 1px solid #ddd; background: #f8f8f8; padding: 6px 8px; border-radius: 8px; cursor: pointer;
+    }
+    #controls button:hover,
+    #paintControls button:hover { background: #f0f0f0; }
+
+    .paint-menu-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+
+    .paint-menu-button img {
+      width: 18px;
+      height: 18px;
+    }
+
+    .paint-menu-button.active {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+    }
+
+    #legend { display: none; align-items: center; gap: 6px; }
+    #legend .swatch { width: 18px; height: 12px; border-radius: 2px; border: 1px solid #00000022; }
+    .muted { color:#666; font-size:12px; }
+
+    .layer-list {
+      display: grid;
+      gap: 6px;
+      max-height: 200px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .layer-row {
+      display: grid;
+      grid-template-columns: auto auto 1fr auto auto auto;
+      gap: 6px;
+      align-items: center;
+      padding: 4px 6px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .layer-row.current {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+    }
+
+    .layer-name {
+      font-size: 12px;
+      color: #1f2937;
+      text-align: left;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .layer-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .layer-action-btn {
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 11px;
+      cursor: pointer;
+      color: #374151;
+    }
+
+    .layer-action-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .layer-add-row {
+      display: flex;
+      align-items: center;
+    }
+
+    .layer-add-row button {
+      width: 100%;
+    }
+
+    .data-store-button {
+      width: 100%;
+      text-align: left;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 12px;
+      color: #1f2937;
+      cursor: pointer;
+    }
+
+    .data-store-button:hover {
+      background: #f9fafb;
+    }
+
+    .inline { display:grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    input[type="range"] { width: 100%; margin: 0; }
+    output { font-size: 12px; color:#333; min-width: 2.8ch; text-align: right; }
+
+    /* overlays */
+    .overlay {
+      position: absolute; inset: 0; display: none; place-items: center;
+      background: rgba(0,0,0,.35); z-index: 30;
+    }
+    .overlay.show { display: grid; }
+    .modal {
+      width: min(96vw, 680px); max-height: 88vh; overflow: hidden;
+      background: #fff; border-radius: 12px; box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px;
+    }
+    .modal h3 { margin: 0 0 4px; font-size: 16px; }
+    .modal .footer { display: flex; gap: 8px; justify-content: flex-end; }
+
+    .section-title { font-weight: 600; margin-top: 4px; }
+    .divider { height: 1px; background: #e6e6e6; margin: 6px 0; }
+
+         /* field lists */
+     .fieldlist { display: grid; grid-template-columns: 1fr; gap: 8px; }
+     #fieldList, #numericFieldList, #categoricalFieldList { max-height: 60vh; overflow: auto; padding-right: 4px; }
+
+    .progress { height: 8px; background: #eee; border-radius: 999px; overflow: hidden; }
+    .progress .bar { height: 100%; width: 0%; background: #3b82f6; transition: width .2s linear; }
+    .progress.indeterminate .bar { width: 30%; animation: indet 1.2s infinite linear; }
+    @keyframes indet { 0% { margin-left: -30% } 100% { margin-left: 100% } }
+
+    /* Vertical Toolbar Styles */
+    #verticalToolbar {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      z-index: 25;
+      backdrop-filter: blur(4px);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 4px;
+      box-sizing: border-box;
+    }
+
+    .home-link {
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #fff;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .home-link img {
+      width: 16px;
+      height: 16px;
+    }
+
+    .home-link:hover {
+      background: #eef2ff;
+      border-color: #c7d2fe;
+    }
+
+    .toolbar-button {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #ddd;
+      background: #f8f8f8;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .toolbar-button:hover {
+      background: #f0f0f0;
+      border-color: #bbb;
+    }
+
+    .toolbar-button.active {
+      background: #f0f0f0;
+      border-color: #bbb;
+      color: inherit;
+    }
+
+    .toolbar-button.active svg path {
+      fill: inherit;
+    }
+
+    /* Active tool state for mutually exclusive tools (Info, Select) */
+    .toolbar-button.active-tool {
+      background: #ffffff;
+      border-color: #3b82f6;
+      border-width: 2px;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      color: inherit;
+    }
+
+    .toolbar-button.active-tool svg path {
+      fill: inherit;
+    }
+
+    .toolbar-button svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .toolbar-button img {
+      width: 16px;
+      height: 16px;
+    }
+
+    .toolbar-button .hotkey {
+      position: absolute;
+      top: 1px;
+      left: 1px;
+      font-size: 7px;
+      font-weight: bold;
+      color: #666;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 2px;
+      padding: 0px 2px;
+      line-height: 1;
+    }
+
+    .toolbar-button .corner-triangle {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 6px;
+      height: 6px;
+      opacity: 0.7;
+    }
+
+    .toolbar-button.has-submenu {
+      position: relative;
+    }
+
+    .toolbar-submenu {
+      position: absolute;
+      left: 100%;
+      top: 0;
+      margin-left: 8px;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(4px);
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+      padding: 6px;
+      min-width: 160px;
+      z-index: 30;
+    }
+
+    .toolbar-submenu.show {
+      display: flex;
+    }
+
+    .submenu-button {
+      padding: 8px 12px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-radius: 4px;
+      text-align: left;
+      font-size: 13px;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background-color 0.2s ease;
+    }
+
+    .submenu-button:hover {
+      background: #f0f0f0;
+    }
+
+    .submenu-button img {
+      width: 20px;
+      height: 20px;
+    }
+
+    .submenu-button.active-tool {
+      background: #3b82f6;
+      color: white;
+    }
+    /* Zoom Toolbar Styles */
+    #zoomToolbar {
+      position: absolute;
+      left: 10px;
+      bottom: 60px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      z-index: 25;
+      backdrop-filter: blur(4px);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 4px;
+      box-sizing: border-box;
+    }
+
+    /* Tip Alert Styles */
+    #tipAlert {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(52, 58, 64, 0.9);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 50px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      font-size: 13px;
+      pointer-events: auto;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    #tipAlert.hidden {
+      opacity: 0;
+      transform: translateX(-50%) translateY(20px);
+      pointer-events: none;
+    }
+
+    .tip-tag {
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .kbd {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: monospace;
+      font-size: 11px;
+    }
+
+    .close-tip {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0;
+      margin-left: 4px;
+      line-height: 1;
+    }
+
+    .close-tip:hover {
+      color: white;
+    }
+  </style>
+</head>
+  <body>
+    <div id="app">
+      <div id="map"></div>
+
+      <!-- Vertical Toolbar -->
+      <div id="verticalToolbar">
+
+        <a id="" class="home-link" title="Return home" href="../">
+          <img src="./src/svg/home.svg" alt="Home" />
+        </a>
+
+        <button id="panToolButton" class="toolbar-button" title="Pan tool (H)">
+          <img src="./src/svg/pan.svg" alt="Pan" />
+          <span class="hotkey">H</span>
+        </button>
+
+        <button id="selectToolButton" class="toolbar-button has-submenu" title="Select Tool (V)">
+          <img src="./src/svg/select_cursor.svg" alt="Select" />
+          <span class="hotkey">V</span>
+          <img src="./src/svg/corner_triangle.svg" alt="" class="corner-triangle" />
+        </button>
+
+        <button id="infoToolButton" class="toolbar-button" title="Inspect tool (I)">
+          <img src="./src/svg/info.svg" alt="Info" />
+          <span class="hotkey">I</span>
+        </button>
+
+        <button id="settingsToolButton" class="toolbar-button" title="Show/hide settings">
+          <img src="./src/svg/settings.svg" alt="Settings" />
+        </button>
+
+        <button id="legendToolButton" class="toolbar-button" title="Show/hide legend">
+          <img src="./src/svg/legend.svg" alt="Legend" />
+        </button>
+
+        <div id="selectSubmenu" class="toolbar-submenu">
+          <button class="submenu-button" data-mode="select-one" title="Select individual parcels by clicking">
+            <img src="./src/svg/select_cursor.svg" alt="Select One" />
+            One
+          </button>
+          <button class="submenu-button" data-mode="select-rectangle" title="Select parcels by drawing a rectangle (Shift+click+drag)">
+            <img src="./src/svg/select_rectangle.svg" alt="Select Rectangle" />
+            Rectangle
+          </button>
+          <button class="submenu-button" data-mode="select-lasso" title="Select parcels by drawing a freeform lasso (not implemented)">
+            <img src="./src/svg/select_lasso.svg" alt="Select Lasso" />
+            Lasso
+          </button>
+          <button class="submenu-button" data-mode="select-polygon" title="Select parcels by drawing a polygon">
+            <img src="./src/svg/select_polygon.svg" alt="Select Polygon" />
+            Polygon
+          </button>
+        </div>
+      </div>
+
+      <!-- Zoom Toolbar -->
+      <div id="zoomToolbar">
+        <button id="zoomInButton" class="toolbar-button" title="Zoom In (+)">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="zoomOutButton" class="toolbar-button" title="Zoom Out (-)">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="resetNorthButton" class="toolbar-button" title="Reset North (N)">
+          <svg id="compassNeedle" viewBox="0 0 24 24" width="16" height="16" style="pointer-events: none;">
+            <path d="M12 2L16 12H8L12 2Z" fill="#333" />
+            <path d="M12 22L8 12H16L12 22Z" fill="#bbb" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Tip Alert -->
+      <div id="tipAlert">
+        <span class="tip-tag">Tip:</span>
+        <span>Hold <span class="kbd">Ctrl</span> + drag to orbit 3D</span>
+        <button class="close-tip" id="btnCloseTip">&times;</button>
+      </div>
+
+
+
+
+          <div id="controls" style="position: absolute; top: 10px; left: 60px; width: min(calc(92vw - 80px), 420px); background: var(--panel); border-radius: 12px; box-shadow: var(--shadow); display: none; gap: var(--gap); z-index: 10; cursor: move;">
+      <div class="window-header" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #eee; background: rgba(248, 248, 248, 0.8); border-radius: 12px 12px 0 0; cursor: move;">
+        <div style="font-weight: 600; font-size: 13px;">Settings</div>
+        <button id="btnMinimizeSettings" style="border: none; background: none; cursor: pointer; font-size: 14px; color: #666; padding: 2px; width: 20px; height: 20px; border-radius: 3px; display: flex; align-items: center; justify-content: center;" title="Minimize">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+				<path d="M7 10l5 5 5-5z"/>
+			</svg>
+		</button>
+      </div>
+      <div id="settingsContent" style="padding: 12px;">
+      <div id="settingsTopActions" class="buttons" style="margin-bottom: 8px;">
+        <button id="btn-zoomto" type="button">Zoom to data</button>
+      </div>
+      <fieldset id="layerPanel">
+        <label>Layers</label>
+        <div id="layerList" class="layer-list"></div>
+        <div class="layer-add-row">
+          <button id="addLayerFromStore" type="button">Add layer</button>
+        </div>
+      </fieldset>
+
+      <div class="divider"></div>
+
+      <fieldset>
+        <label for="field">Field to visualize</label>
+        <select id="field"><option value="" disabled selected>— load a file first —</option></select>
+      </fieldset>
+
+      <div class="buttons">
+        <button id="btnPaintMenu" type="button" class="paint-menu-button">
+          <img src="./src/svg/paint.svg" alt="" />
+          Paint
+        </button>
+      </div>
+
+      <div class="divider"></div>
+
+      <fieldset>
+        <label>View presets</label>
+        <div class="buttons">
+          <button data-view="top">Top</button>
+          <button data-view="iso">Perspective</button>
+          <button data-view="north">North</button>
+          <button data-view="east">East</button>
+          <button data-view="south">South</button>
+          <button data-view="west">West</button>
+        </div>
+      </fieldset>
+
+
+      <fieldset id="legend">      </fieldset>
+      </div>
+    </div>
+  </div>
+
+  <div id="paintControls" style="position: absolute; top: 10px; left: 520px; width: min(calc(92vw - 80px), 360px); background: var(--panel); border-radius: 12px; box-shadow: var(--shadow); display: none; gap: var(--gap); z-index: 10; cursor: move;">
+    <div class="window-header" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #eee; background: rgba(248, 248, 248, 0.8); border-radius: 12px 12px 0 0; cursor: move;">
+      <div style="font-weight: 600; font-size: 13px;">Paint</div>
+      <button id="btnMinimizePaint" style="border: none; background: none; cursor: pointer; font-size: 14px; color: #666; padding: 2px; width: 20px; height: 20px; border-radius: 3px; display: flex; align-items: center; justify-content: center;" title="Minimize">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M7 10l5 5 5-5z"/>
+        </svg>
+      </button>
+    </div>
+    <div id="paintContent" style="padding: 12px; display: grid; gap: 10px;">
+      <!-- Numeric field options -->
+      <fieldset id="numericOptions">
+        <label>Field type: numeric</label>
+
+        <!-- Normalization choices -->
+        <div id="normGroup" style="display:grid; gap:6px; margin-top:6px;">
+          <label style="display:flex; gap:8px; align-items:center;">
+            <input type="radio" name="normMode" id="norm-asis" value="asis" checked />
+            <span>as-is</span>
+          </label>
+          <label style="display:flex; gap:8px; align-items:center;">
+            <input type="radio" name="normMode" id="norm-land" value="perLand" disabled />
+            <span>…per land size <em id="normLandUnit">(unit)</em></span>
+          </label>
+          <label style="display:flex; gap:8px; align-items:center;">
+            <input type="radio" name="normMode" id="norm-bldg" value="perBuilding" disabled />
+            <span>…per building size <em id="normBldgUnit">(unit)</em></span>
+          </label>
+        </div>
+
+        <fieldset>
+          <label>Color scaling</label>
+          <div style="display:grid; gap:6px;">
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="radio" name="colorMode" id="color-cont" value="continuous">
+              <span>Linear (min→max, clamped p1–p99)</span>
+            </label>
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="radio" name="colorMode" id="color-quant" value="quantiles" checked>
+              <span>Quantiles (equal-frequency, p1–p99)</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="row">
+          <div>
+			<label>Super Fancy 3D Extrusion!</label>
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" id="enable3D" />
+              <span>3D enabled</span>
+            </label>
+          </div>
+        </fieldset>
+        <fieldset class="row" id="extrusionOptions" style="display: none;">
+          <div>
+            <label for="mult">Extrusion multiplier</label>
+            <input id="mult" type="number" step=".1" value="1" />
+          </div>
+          <div>
+            <label for="units">Units</label>
+            <select id="units">
+              <option value="centimeters" selected>centimeters</option>
+              <option value="meters">meters</option>
+              <option value="inches">inches</option>
+              <option value="feet">feet</option>
+              <option value="kilometers">kilometers</option>
+              <option value="miles">miles</option>
+              <option value="stories">stories (~3.3m)</option>
+            </select>
+          </div>
+        </fieldset>
+      </fieldset>
+
+      <!-- Categorical field options -->
+      <fieldset id="categoricalOptions" style="display: none;">
+        <label>Field type: categorical</label>
+        <div style="display:grid; gap:6px;">
+          <label>Color method</label>
+             <div style="display:grid; gap:6px;">
+             <label style="display:flex; gap:8px; align-items:center;">
+               <input type="radio" name="categoricalColorMode" id="cat-random" value="random" checked>
+               <span>Random color</span>
+             </label>
+             <label style="display:flex; gap:8px; align-items:center;">
+               <input type="radio" name="categoricalColorMode" id="cat-single" value="single">
+               <span>Single color</span>
+             </label>
+			 <div style="display:grid; gap:6px;">
+             <label style="display:flex; gap:8px; align-items:center;">
+               <input type="radio" name="categoricalColorMode" id="cat-ramp" value="colorRamp">
+               <span>Color ramp</span>
+             </label>
+           </div>
+
+                       <!-- Color options (only shown for single color) -->
+            <div id="colorOptions" style="display: none;">
+              <label>Color options</label>
+              <div style="display:grid; gap:8px;">
+                <input type="color" id="colorPicker" value="#3b82f6" style="width:100%; height:40px; border:2px solid #ddd; border-radius:6px; cursor:pointer;">
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                  <button id="btnCancelColorPicker" style="font-size:12px; padding:4px 8px;">Cancel</button>
+                  <button id="btnConfirmColorPicker" style="font-size:12px; padding:4px 8px;">OK</button>
+                </div>
+              </div>
+            </div>
+        </div>
+      </fieldset>
+
+      <!-- Shared visualization options -->
+      <fieldset id="sharedOptions" style="display: none;">
+        <fieldset class="row">
+          <div>
+            <label for="ramp">Color ramp</label>
+            <select id="ramp"></select>
+          </div>
+          <div>
+            <label for="opacity">Opacity</label>
+            <div class="inline">
+              <input id="opacity" type="range" min="0" max="1" step="0.05" value="0.9" />
+              <output id="opacityVal">0.9</output>
+            </div>
+          </div>
+        </fieldset>
+      </fieldset>
+    </div>
+  </div>
+
+  <!-- Modal 1: Numeric field chooser -->
+  <div id="numericModalOverlay" class="overlay">
+    <div class="modal">
+      <h3>Select numeric fields to load</h3>
+      <div class="muted">Rows: <span id="rowCount">–</span>. Geometry column: <code id="geomCol">–</code></div>
+      <div class="buttons">
+        <button id="btnAllNumeric">Select all</button>
+        <button id="btnNoneNumeric">Select none</button>
+      </div>
+      <div id="numericFieldList" class="fieldlist"></div>
+      <div class="footer">
+        <button id="btnCancelNumericModal">Cancel</button>
+        <button id="btnConfirmNumericModal">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Categorical field chooser -->
+  <div id="categoricalModalOverlay" class="overlay">
+    <div class="modal">
+      <h3>Select categorical fields to load</h3>
+      <div class="muted">Rows: <span id="categoricalRowCount">–</span>. Geometry column: <code id="categoricalGeomCol">–</code></div>
+      <div class="buttons">
+        <button id="btnAllCategorical">Select all</button>
+        <button id="btnNoneCategorical">Select none</button>
+      </div>
+      <div id="categoricalFieldList" class="fieldlist"></div>
+      <div class="footer">
+        <button id="btnCancelCategoricalModal">Cancel</button>
+        <button id="btnConfirmCategoricalModal">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Size identification -->
+  <div id="sizeOverlay" class="overlay">
+    <div class="modal">
+      <h3>Identify land & building size fields</h3>
+      <div class="muted">Please identify which of your loaded fields represent: (a) total finished floor area for all buildings, and (b) total land area.</div>
+
+      <div style="display:grid; gap:8px;">
+        <label>Building size field</label>
+        <select id="bldgField"></select>
+        <label>Building size unit</label>
+        <select id="bldgUnit"></select>
+
+        <div class="divider"></div>
+
+        <label>Land size field</label>
+        <select id="landField"></select>
+        <label>Land size unit</label>
+        <select id="landUnit"></select>
+      </div>
+
+      <div class="footer">
+        <button id="btnSizeBack">Back</button>
+        <button id="btnSizeSkip">Skip</button>
+        <button id="btnSizeOk">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add layer -->
+  <div id="addLayerOverlay" class="overlay">
+    <div class="modal">
+      <h3>Add a layer</h3>
+      <div class="muted">Choose an existing data source or browse for a GeoParquet file.</div>
+
+      <div class="section-title">Existing data sources</div>
+      <div id="dataStoreList" class="layer-list"></div>
+
+      <div class="divider"></div>
+
+      <div class="buttons">
+        <button id="btnBrowseDataSource" type="button">Browse for file…</button>
+      </div>
+
+      <div class="footer">
+        <button id="btnCancelAddLayer" type="button">Cancel</button>
+      </div>
+
+      <input id="file" type="file" accept=".parquet,.parq" style="display:none" />
+    </div>
+  </div>
+
+  <!-- Loading / progress -->
+  <div id="loadingOverlay" class="overlay">
+    <div class="modal">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div>Loading…</div>
+        <button id="btnCancelLoading">Cancel</button>
+      </div>
+      <div id="progress" class="progress indeterminate"><div id="progressBar" class="bar"></div></div>
+      <div id="progressMsg" class="muted">Parsing GeoParquet…</div>
+    </div>
+  </div>
+
+  <!-- Floating Legend -->
+  <div id="floatingLegend" style="
+    position: absolute;
+    top: 140px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-width: 280px;
+    max-height: 70vh;
+    overflow: hidden;
+    z-index: 15;
+    display: none;
+    backdrop-filter: blur(4px);
+    cursor: move;
+  ">
+    <div class="window-header" style="
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid #eee;
+      background: rgba(248, 248, 248, 0.8);
+      border-radius: 8px 8px 0 0;
+      cursor: move;
+    ">
+      <div style="font-weight: 600; font-size: 13px;" id="legendTitle">Legend</div>
+      <button id="btnMinimizeLegend" style="
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 14px;
+        color: #666;
+        padding: 2px;
+        width: 20px;
+        height: 20px;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      " title="Minimize">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+				<path d="M7 10l5 5 5-5z"/>
+			</svg>
+	  </button>
+    </div>
+    <div id="legendContent" style="
+      padding: 8px;
+      max-height: calc(70vh - 40px);
+      overflow-y: auto;
+    "></div>
+  </div>
+
+
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

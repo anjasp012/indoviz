@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Put It On A Map</title>
+  <link rel="shortcut icon" type="image/x-icon" href="images/favicon.ico"/>
+  <link rel="stylesheet" href="shared.css" />
+  <link rel="stylesheet" href="main.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="container header-row">
+        <a class="brand" href="./" aria-label="Put It On A Map home">
+          <img src="images/logo.svg" alt="putitonamap logo">
+          <div>PutItOnAMap.com</div>
+        </a>
+        <nav class="nav-links" aria-label="Primary">
+          <a href="about.html">About</a>
+          <a href="https://github.com/larsiusprime/geovizwiz">Source</a>
+        </nav>
+      </div>
+    </header>
+    <main>
+      <section class="container hero">
+        <div>
+          <h1>GIS visualization made simple</h1>
+          <p>
+            Download, convert, and visualize GIS data in 3D, without having to install anything
+          </p>
+          <div class="app-grid">
+            <article class="card">
+              <h2>3D Parcel Explorer</h2>
+              <p>Open GeoParquet or shapefiles, choose attributes, and visualize parcels in 3D.</p>
+              <p>&nbsp;</p>
+              <a class="button" href="viz/">3D Viz</a>
+            </article>
+            <article class="card">
+              <h2>Data Fetcher</h2>
+              <p>Connect to ArcGIS REST services, browse layers, and export GeoParquet locally.</p>
+              <p>&nbsp;</p>
+              <a class="button" href="util/fetch.html">Fetch</a>
+            </article>
+            <article class="card">
+              <h2>GIS Format Converter</h2>
+              <p>Upload GIS files, inspect metadata, and convert between formats.</p>
+              <p>&nbsp;</p>
+              <a class="button" href="util/convert.html">Convert</a>
+            </article>
+          </div>
+        </div>
+      </section>
+      <section class="container">
+        <div>
+          <h1>Simple & Privacy-Preserving</h1>
+          <ul>
+            <li>Collects no data, never touches our servers.</li>
+            <li>Completely free and Open source.</li>
+            <li>Learn more <a href="about.html">here</a>.</li>
+          </p>
+      </section>
+    </main>
+    <footer>
+    © <span id="y"></span> Lars Doucet<br>
+    Brought to you by the <a href="https://www.landeconomics.org">Center for Land Economics</a>
+    </footer>
+  </div>
+  <script>document.getElementById('y').textContent = new Date().getFullYear()</script>
+</body>
+</html>
