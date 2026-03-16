@@ -21,7 +21,7 @@ a:hover {
   color: #535bf2;
 }
 
-/* ===== FULL SCREEN BASE ===== */
+/* ===== FULLSCREEN BASE ===== */
 
 html,
 body {
@@ -52,10 +52,11 @@ body {
 /* ===== MAP FULLSCREEN ===== */
 
 #map {
-  position: absolute;
+  position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
+  z-index: 1;
 }
 
 /* paksa canvas MapLibre selalu full */
@@ -68,7 +69,7 @@ body {
 /* ===== FLOATING SIDEBAR ===== */
 
 #sidebar {
-  position: absolute;
+  position: fixed;
   top: 16px;
   left: 16px;
   width: 340px;
@@ -122,33 +123,4 @@ body {
 #toolbar,
 #verticalToolbar {
   display: none !important;
-}
-
-/* FORCE MAP FULLSCREEN */
-
-#map {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  z-index: 1 !important;
-}
-
-/* SIDEBAR FLOATING */
-
-#sidebar {
-  position: fixed !important;
-  top: 16px !important;
-  left: 16px !important;
-  width: 340px !important;
-  max-height: calc(100vh - 32px) !important;
-  z-index: 9999 !important;
-}
-
-/* MAPLIBRE CANVAS FIX */
-
-#map .maplibregl-canvas-container,
-#map canvas {
-  width: 100% !important;
-  height: 100% !important;
 }
