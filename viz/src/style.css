@@ -54,8 +54,15 @@ body {
 #map {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* paksa canvas MapLibre selalu full */
+#map .maplibregl-canvas-container,
+#map canvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* ===== FLOATING SIDEBAR ===== */
