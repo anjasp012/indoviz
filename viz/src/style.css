@@ -48,13 +48,18 @@ body {
 }
 
 #sidebar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
   width: 340px;
-  min-width: 340px;
-  height: 100%;
-  background: #f7f3ef;
-  border-right: 1px solid #ddd;
+  max-height: calc(100vh - 32px);
+  background: rgba(247, 243, 239, 0.96);
+  border: 1px solid #ddd;
+  border-radius: 16px;
   overflow-y: auto;
-  z-index: 5;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(6px);
 }
 
 .sidebar-inner {
