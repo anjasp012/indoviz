@@ -31,9 +31,19 @@ const map = new maplibregl.Map({
     hash: true,
     boxZoom: false,
     doubleClickZoom: false,
-    pixelRatio: HQ_PR // supersample: render at higher internal resolution (smooth lines)
+    pixelRatio: HQ_PR
 });
+
 map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+
+map.on('load', () => {
+    const style = map.getStyle();
+    style.layers?.forEach((layer) => {
+        if (layer.id.toLowerCase().includes('building')) {
+            map.setLayoutProperty(layer.id, 'visibility', 'none');
+        }
+    });
+});
 /* ---------------- Cursor Management ---------------- */
 
 // Update cursor based on active tool
