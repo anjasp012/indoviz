@@ -37,10 +37,10 @@ body {
 }
 
 #app {
-  display: flex;
   width: 100%;
   height: 100vh;
   position: relative;
+  overflow: hidden;
   max-width: none !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -75,9 +75,20 @@ body {
 }
 
 #map {
-  position: relative;
-  flex: 1;
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
+}
+
+#sidebar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 340px;
+  max-height: calc(100vh - 32px);
+  z-index: 1000;
+  overflow-y: auto;
 }
 
 /* ===== GEO VIZ CUSTOM UI ===== */
