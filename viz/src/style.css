@@ -3,7 +3,7 @@
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
+  color: #222;
   background-color: #242424;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -21,7 +21,8 @@ a:hover {
   color: #535bf2;
 }
 
-/* full screen layout */
+/* ===== FULL SCREEN BASE ===== */
+
 html,
 body {
   width: 100%;
@@ -31,21 +32,33 @@ body {
 }
 
 body {
-  display: block !important;
   min-width: 320px;
   min-height: 100vh;
+  overflow: hidden;
 }
 
+/* ===== APP CONTAINER ===== */
+
 #app {
+  position: relative;
   width: 100%;
   height: 100vh;
-  position: relative;
   overflow: hidden;
   max-width: none !important;
   margin: 0 !important;
   padding: 0 !important;
-  text-align: unset !important;
 }
+
+/* ===== MAP FULLSCREEN ===== */
+
+#map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== FLOATING SIDEBAR ===== */
 
 #sidebar {
   position: absolute;
@@ -53,12 +66,17 @@ body {
   left: 16px;
   width: 340px;
   max-height: calc(100vh - 32px);
+
   background: rgba(247, 243, 239, 0.96);
   border: 1px solid #ddd;
   border-radius: 16px;
+
   overflow-y: auto;
-  z-index: 20;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  overflow-x: hidden;
+
+  z-index: 9999;
+
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(6px);
 }
 
@@ -69,40 +87,32 @@ body {
 .panel-block {
   margin-top: 16px;
   padding: 12px;
-  background: #fff;
+  background: #ffffff;
   border: 1px solid #e5ddd5;
   border-radius: 12px;
 }
 
-#map {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-#sidebar {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  width: 340px;
-  max-height: calc(100vh - 32px);
-  z-index: 1000;
-  overflow-y: auto;
-}
-
-/* ===== GEO VIZ CUSTOM UI ===== */
+/* ===== MAPLIBRE CONTROLS ===== */
 
 .maplibregl-ctrl-top-left {
   display: none !important;
 }
 
-.toolbar,
-.left-toolbar,
-#toolbar {
-  display: none !important;
+.maplibregl-ctrl-bottom-left {
+  left: 16px !important;
+  bottom: 16px !important;
 }
 
+.maplibregl-ctrl-group {
+  border-radius: 10px !important;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.15) !important;
+}
+
+/* ===== TOOLBAR ===== */
+
+.toolbar,
+.left-toolbar,
+#toolbar,
 #verticalToolbar {
   display: none !important;
 }
