@@ -34,6 +34,11 @@ const map = new maplibregl.Map({
     pixelRatio: HQ_PR
 });
 
+/* FIX MAP SIZE */
+setTimeout(() => map.resize(), 300);
+window.addEventListener("load", () => map.resize());
+window.addEventListener("resize", () => map.resize());
+
 map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
 map.on('load', () => {
