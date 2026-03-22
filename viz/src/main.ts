@@ -772,7 +772,78 @@ if (btnCloseTip && tipAlert) {
 
 // Toolbar elements
 const legendToolButton = document.getElementById('legendToolButton') as HTMLButtonElement;
+// Basemap Segmented Toggle
+const basemapBtns = document.querySelectorAll<HTMLButtonElement>('.basemap-toggle .segmented-btn');
 
+function updateBasemap(mode: string) {
+    const urls: Record<string, string> = {
+        'satellite': 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+        'hybrid': 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+    };
+
+    // Hide both layers initially
+    if (map.getLayer('google-satellite-layer')) {
+        map.setLayoutProperty('google-satellite-layer', 'visibility', 'none');
+    }
+    if (map.getLayer('google-hybrid-layer')) {
+        map.setLayoutProperty('google-hybrid-layer', 'visibility', 'none');
+    }
+
+    if (mode === 'osm' || !urls[mode]) return;
+
+    const sourceId = `google-${mode}-source`;
+    const layerId = `google-${mode}-layer`;
+
+    // Ensure source exists
+    if (!map.getSource(sourceId)) {
+        map.addSource(sourceId, {
+            type: 'raster',
+            tiles: [urls[mode]],
+            tileSize: 256,
+            attribution: '© Google'
+        });
+    }
+
+    // Ensure layer exists
+    if (!map.getLayer(layerId)) {
+        let beforeId;
+        const style = map.getStyle();
+        if (style && style.layers) {
+            for (const layer of style.layers) {
+                if (layer.id.startsWith('gp-') || layer.id.startsWith('highlight-') || layer.id.startsWith('selection-') || layer.id.includes('gl-draw')) {
+                    beforeId = layer.id;
+                    break;
+                }
+            }
+        }
+
+        map.addLayer({
+            id: layerId,
+            type: 'raster',
+            source: sourceId,
+            layout: { visibility: 'visible' },
+            paint: { 'raster-opacity': 1 }
+        }, beforeId);
+    } else {
+        map.setLayoutProperty(layerId, 'visibility', 'visible');
+    }
+}
+
+if (basemapBtns.length > 0) {
+    basemapBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = e.currentTarget as HTMLButtonElement;
+
+            // Update UI buttons
+            basemapBtns.forEach(b => b.classList.remove('is-active'));
+            target.classList.add('is-active');
+
+            // Apply selected basemap mode
+            const mode = target.getAttribute('data-mode') || 'osm';
+            updateBasemap(mode);
+        });
+    });
+}
 // Floating legend elements
 const floatingLegend = document.getElementById('floatingLegend') as HTMLDivElement;
 const btnMinimizeLegend = document.getElementById('btnMinimizeLegend') as HTMLButtonElement;

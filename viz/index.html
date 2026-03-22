@@ -36,6 +36,11 @@ html, body, #app {
   border-right: 1px solid #ddd;
   overflow-y: auto;
   z-index: 20;
+  transition: margin-left 0.3s ease;
+}
+
+#app.sidebar-hidden #sidebar {
+  margin-left: -340px;
 }
 
 .sidebar-inner {
@@ -225,9 +230,23 @@ html, body, #app {
     @keyframes indet { 0% { margin-left: -30% } 100% { margin-left: 100% } }
 
     /* Vertical Toolbar Styles */
+    #verticalToolbar, #zoomToolbar, #controls, #paintControls {
+      transition: transform 0.3s ease;
+    }
+
+    #app.sidebar-hidden #zoomToolbar,
+    #app.sidebar-hidden #controls,
+    #app.sidebar-hidden #paintControls {
+      transform: translateX(-340px);
+    }
+
+    #app.sidebar-hidden #verticalToolbar {
+      transform: translate(-340px, 38px);
+    }
+
     #verticalToolbar {
       position: absolute;
-      left: 10px;
+      left: 350px;
       top: 10px;
       background: rgba(255, 255, 255, 0.95);
       border: 1px solid #ddd;
@@ -396,7 +415,7 @@ html, body, #app {
     /* Zoom Toolbar Styles */
     #zoomToolbar {
       position: absolute;
-      left: 10px;
+      left: 350px;
       bottom: 60px;
       background: rgba(255, 255, 255, 0.95);
       border: 1px solid #ddd;
@@ -411,11 +430,71 @@ html, body, #app {
       box-sizing: border-box;
     }
 
+    /* Sidebar Toggle Button */
+    .sidebar-toggle {
+      position: absolute;
+      top: 20px;
+      left: 290px;
+      width: 34px;
+      height: 34px;
+      background: #fff;
+      border: 1px solid #e1e1e1;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 30;
+      transition: transform 0.3s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      color: #333;
+    }
+    .sidebar-toggle:hover {
+      background: #f9fafb;
+    }
+    #app.sidebar-hidden .sidebar-toggle {
+      transform: translate(-280px, -10px) rotate(180deg);
+    }
+
+    /* Basemap Segmented Control */
+    .basemap-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      padding: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 25;
+      backdrop-filter: blur(4px);
+    }
+    .segmented-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .segmented-btn:hover {
+      color: #333;
+    }
+    .segmented-btn.is-active {
+      background: #4a80f5;
+      color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
     /* Tip Alert Styles */
     #tipAlert {
       position: absolute;
       bottom: 20px;
-      left: 50%;
+      left: calc(50% + 170px);
       transform: translateX(-50%);
       background: rgba(52, 58, 64, 0.9);
       color: white;
@@ -428,7 +507,11 @@ html, body, #app {
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
       font-size: 13px;
       pointer-events: auto;
-      transition: opacity 0.3s ease, transform 0.3s ease;
+      transition: left 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    #app.sidebar-hidden #tipAlert {
+      left: 50%;
     }
 
     #tipAlert.hidden {
@@ -485,6 +568,18 @@ html, body, #app {
       </div>
     </div>
   </aside>
+
+  <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Toggle sidebar">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M11 3L5 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </button>
+
+  <div id="basemap-toggle" class="basemap-toggle">
+    <button type="button" class="segmented-btn is-active" data-mode="osm">Peta</button>
+    <button type="button" class="segmented-btn" data-mode="satellite">Citra</button>
+    <button type="button" class="segmented-btn" data-mode="hybrid">Hybrid</button>
+  </div>
 
   <div id="map"></div>
 
@@ -565,7 +660,7 @@ html, body, #app {
 
 
 
-          <div id="controls" style="position: absolute; top: 10px; left: 60px; width: min(calc(92vw - 80px), 420px); background: var(--panel); border-radius: 12px; box-shadow: var(--shadow); display: none; gap: var(--gap); z-index: 10; cursor: move;">
+          <div id="controls" style="position: absolute; top: 10px; left: 400px; width: min(calc(92vw - 80px), 420px); background: var(--panel); border-radius: 12px; box-shadow: var(--shadow); display: none; gap: var(--gap); z-index: 10; cursor: move;">
       <div class="window-header" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #eee; background: rgba(248, 248, 248, 0.8); border-radius: 12px 12px 0 0; cursor: move;">
         <div style="font-weight: 600; font-size: 13px;">Settings</div>
         <button id="btnMinimizeSettings" style="border: none; background: none; cursor: pointer; font-size: 14px; color: #666; padding: 2px; width: 20px; height: 20px; border-radius: 3px; display: flex; align-items: center; justify-content: center;" title="Minimize">
@@ -620,7 +715,7 @@ html, body, #app {
     </div>
   </div>
 
-  <div id="paintControls" style="position: absolute; top: 10px; left: 520px; width: min(calc(92vw - 80px), 360px); background: var(--panel); border-radius: 12px; box-shadow: var(--shadow); display: none; gap: var(--gap); z-index: 10; cursor: move;">
+  <div id="paintControls" style="position: absolute; top: 10px; left: 860px; width: min(calc(92vw - 80px), 360px); background: var(--panel); border-radius: 12px; box-shadow: var(--shadow); display: none; gap: var(--gap); z-index: 10; cursor: move;">
     <div class="window-header" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #eee; background: rgba(248, 248, 248, 0.8); border-radius: 12px 12px 0 0; cursor: move;">
       <div style="font-weight: 600; font-size: 13px;">Paint</div>
       <button id="btnMinimizePaint" style="border: none; background: none; cursor: pointer; font-size: 14px; color: #666; padding: 2px; width: 20px; height: 20px; border-radius: 3px; display: flex; align-items: center; justify-content: center;" title="Minimize">
@@ -903,5 +998,22 @@ html, body, #app {
   </div>
 
   <script type="module" src="./src/main.ts"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('sidebar-toggle');
+      if(btn) {
+        btn.addEventListener('click', () => {
+          document.getElementById('app').classList.toggle('sidebar-hidden');
+          setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
+        });
+      }
+      document.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+          document.getElementById('app').classList.toggle('sidebar-hidden');
+          setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
+        }
+      });
+    });
+  </script>
 </body>
 </html>
