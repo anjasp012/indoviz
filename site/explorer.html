@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Explorer | Put It On A Map</title>
+  <link rel="shortcut icon" type="image/x-icon" href="images/favicon.ico"/>
+  <link rel="stylesheet" href="shared.css" />
+  <link rel="stylesheet" href="main.css" />
+  <style>
+    .explorer-grid {
+      display: grid;
+      gap: 24px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      margin-top: 40px;
+    }
+    .data-card {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .data-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+      border-color: var(--accent);
+    }
+    .data-card .thumb {
+      height: 160px;
+      background: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .data-card .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .data-card .content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    .data-card h3 { margin: 0 0 8px; font-size: 1.1rem; }
+    .data-card p { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.5; }
+    .data-card .btn-row { margin-top: 20px; }
+    
+    .btn-viz {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background: var(--accent);
+      color: #fff;
+      text-align: center;
+      text-decoration: none;
+      font-weight: 600;
+      border-radius: 10px;
+      transition: background 0.2s ease;
+    }
+    .btn-viz:hover { background: #3566cb; }
+
+    .btn-upload {
+      border: 2px dashed #ccc;
+      background: #fafafa;
+      color: #666;
+    }
+    .btn-upload:hover { border-color: var(--accent); color: var(--accent); }
+    
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-bottom: 24px;
+        font-weight: 500;
+    }
+    .back-link:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="container header-row">
+        <a class="brand" href="./" aria-label="Put It On A Map home">
+          <img src="images/logo.svg" alt="putitonamap logo">
+          <div>PutItOnAMap.com</div>
+        </a>
+      </div>
+    </header>
+    <main>
+      <div class="container">
+        <a href="./" class="back-link">
+          ← Back to Homepage
+        </a>
+        <h1>Choose a Dataset</h1>
+        <p>Select a pre-processed dataset or upload your own to visualize in 3D.</p>
+        
+        <div id="explorer-grid" class="explorer-grid">
+            <!-- Cards will be added here dynamically -->
+        </div>
+
+        <div style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+            <h3>Upload Your Own</h3>
+            <p>Have your own GeoParquet or ESRI Shapefile? Upload it directly and start exploring immediately.</p>
+            <div style="margin-top: 15px;">
+                <a href="viz/" class="btn-viz btn-upload" style="max-width: 300px;">Open Visualizer</a>
+            </div>
+        </div>
+      </div>
+    </main>
+    <footer>
+    © <span id="y"></span> Arsip Indoviz<br>
+    Brought to you by the Center for Land Economics
+    </footer>
+  </div>
+  <script>
+    document.getElementById('y').textContent = new Date().getFullYear();
+
+    async function loadDatasets() {
+        const grid = document.getElementById('explorer-grid');
+        try {
+            const response = await fetch('viz/data/datasets.json');
+            if (!response.ok) throw new Error('Could not load datasets.json');
+            const files = await response.json();
+            
+            if (files.length === 0) {
+                grid.innerHTML = '<p class="muted">No datasets found in the data directory.</p>';
+                return;
+            }
+
+            files.forEach(filename => {
+                const card = document.createElement('article');
+                card.className = 'data-card';
+                
+                // Try to make a pretty title and select an image
+                let title = filename.replace('.geoparquet', '').replace('.parquet', '').split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                let imageUrl = 'https://images.unsplash.com/photo-1541339907198-e08756eaaaf8?q=80&w=400&h=200&fit=crop'; // Default: Bandung
+
+                if (filename.includes('babakan')) {
+                    imageUrl = 'https://images.unsplash.com/photo-1577086664693-894d8405334a?q=80&w=400&h=200&fit=crop';
+                } else if (filename.includes('submarket')) {
+                    imageUrl = 'https://images.unsplash.com/photo-1526948531399-320e7e40f0ca?q=80&w=400&h=200&fit=crop';
+                } else if (filename.includes('jakarta')) {
+                    imageUrl = 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?q=80&w=400&h=200&fit=crop';
+                }
+
+                card.innerHTML = `
+                    <div class="thumb">
+                        <img src="${imageUrl}" alt="${title}">
+                    </div>
+                    <div class="content">
+                        <h3>${title}</h3>
+                        <p>3D Visualization of ${title} geospatial data parcels and property metrics.</p>
+                        <div class="btn-row">
+                            <a href="viz/?data=${filename}" class="btn-viz">Visualize in 3D</a>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        } catch (err) {
+            console.error(err);
+            grid.innerHTML = '<p class="muted">Datasets manifest not found. Please run build script first.</p>';
+        }
+    }
+
+    loadDatasets();
+  </script>
+</body>
+</html>

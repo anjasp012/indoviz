@@ -42,6 +42,10 @@ jobs:
           npm install
           npm run build -- --outDir ../dist/viz --emptyOutDir
 
+      - name: Generate dataset list
+        run: |
+          node -e 'const fs = require("fs"); const files = fs.readdirSync("viz/public/data"); const parquets = files.filter(f => { const ext = f.toLowerCase(); return ext.endsWith(".parquet") || ext.endsWith(".geoparquet"); }); fs.mkdirSync("dist/viz/data", { recursive: true }); fs.writeFileSync("dist/viz/data/datasets.json", JSON.stringify(parquets, null, 2));'
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

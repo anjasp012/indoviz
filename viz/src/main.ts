@@ -772,7 +772,78 @@ if (btnCloseTip && tipAlert) {
 
 // Toolbar elements
 const legendToolButton = document.getElementById('legendToolButton') as HTMLButtonElement;
+// Basemap Segmented Toggle
+const basemapBtns = document.querySelectorAll<HTMLButtonElement>('.basemap-toggle .segmented-btn');
 
+function updateBasemap(mode: string) {
+    const urls: Record<string, string> = {
+        'satellite': 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+        'hybrid': 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+    };
+
+    // Hide both layers initially
+    if (map.getLayer('google-satellite-layer')) {
+        map.setLayoutProperty('google-satellite-layer', 'visibility', 'none');
+    }
+    if (map.getLayer('google-hybrid-layer')) {
+        map.setLayoutProperty('google-hybrid-layer', 'visibility', 'none');
+    }
+
+    if (mode === 'osm' || !urls[mode]) return;
+
+    const sourceId = `google-${mode}-source`;
+    const layerId = `google-${mode}-layer`;
+
+    // Ensure source exists
+    if (!map.getSource(sourceId)) {
+        map.addSource(sourceId, {
+            type: 'raster',
+            tiles: [urls[mode]],
+            tileSize: 256,
+            attribution: '© Google'
+        });
+    }
+
+    // Ensure layer exists
+    if (!map.getLayer(layerId)) {
+        let beforeId;
+        const style = map.getStyle();
+        if (style && style.layers) {
+            for (const layer of style.layers) {
+                if (layer.id.startsWith('gp-') || layer.id.startsWith('highlight-') || layer.id.startsWith('selection-') || layer.id.includes('gl-draw')) {
+                    beforeId = layer.id;
+                    break;
+                }
+            }
+        }
+
+        map.addLayer({
+            id: layerId,
+            type: 'raster',
+            source: sourceId,
+            layout: { visibility: 'visible' },
+            paint: { 'raster-opacity': 1 }
+        }, beforeId);
+    } else {
+        map.setLayoutProperty(layerId, 'visibility', 'visible');
+    }
+}
+
+if (basemapBtns.length > 0) {
+    basemapBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = e.currentTarget as HTMLButtonElement;
+
+            // Update UI buttons
+            basemapBtns.forEach(b => b.classList.remove('is-active'));
+            target.classList.add('is-active');
+
+            // Apply selected basemap mode
+            const mode = target.getAttribute('data-mode') || 'osm';
+            updateBasemap(mode);
+        });
+    });
+}
 // Floating legend elements
 const floatingLegend = document.getElementById('floatingLegend') as HTMLDivElement;
 const btnMinimizeLegend = document.getElementById('btnMinimizeLegend') as HTMLButtonElement;
@@ -2850,9 +2921,12 @@ function installWelcome() {
     const card = document.createElement('div');
     card.style.cssText = 'background:#fff;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.12);padding:18px 20px;max-width:560px;width:min(92vw,560px);display:grid;gap:12px;text-align:center;';
     card.innerHTML = `
-    <div style="font-size:16px;font-weight:600;">Load a GeoParquet file</div>
-    <div style="color:#666;font-size:13px;">Choose a <code>.parquet</code> to visualize.</div>
-    <div style="color:#666;font-size:13px;">TIP: make sure it has polygon geometry; lines/points won't work.</div>
+    <div style="font-size:16px;font-weight:600;">Explore GIS Data</div>
+    <div style="color:#666;font-size:13px;">Choose a pre-processed dataset from our gallery or upload your own <code>.parquet</code> file.</div>
+    <div style="margin: 8px 0;">
+        <a href="../explorer.html" style="color: #3b82f6; text-decoration: none; font-weight: 600; border: 1px solid #3b82f6; padding: 6px 12px; border-radius: 6px; display: inline-block;">← Back to Gallery</a>
+    </div>
+    <div style="color:#888;font-size:11px;">TIP: Parcels should have Polygon/MultiPolygon geometry.</div>
   `;
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:10px;justify-content:center;flex-wrap:wrap';
@@ -3429,10 +3503,11 @@ async function loadSelectedColumns() {
         const allAvailableFields = [...availableNumeric, ...availableCategorical];
         populateFieldDropdownFromList(allAvailableFields);
 
-        // Auto-select price_m2 and render immediately
-        currentField = 'price_m2';
-        currentFieldType = 'numeric';
-        fieldSelect.value = 'price_m2';
+        // Auto-select first available field and render immediately
+        const defaultField = allAvailableFields[0] || '';
+        currentField = defaultField;
+        currentFieldType = availableNumeric.includes(defaultField) ? 'numeric' : 'categorical';
+        if (fieldSelect) fieldSelect.value = defaultField;
 
         // Match the paint settings you want
         colorMode = 'quantiles';
@@ -4454,15 +4529,26 @@ async function handleSelectedFile(file: File) {
         dataStore.numericFieldsFromSchema = [...lastNumericFieldsFromSchema];
         dataStore.categoricalFieldsFromSchema = [...lastCategoricalFieldsFromSchema];
 
-        // Auto-pick price_m2 and skip chooser modals
-        if (lastNumericFieldsFromSchema.includes('price_m2')) {
-            chosenNumericFields = ['price_m2'];
+        // Auto-pick default field and skip chooser modals
+        const candidateFields = ['price_m2', 'predicted', 'price', 'value', 'amount', 'total'];
+        const defaultField = candidateFields.find(f => lastNumericFieldsFromSchema.includes(f))
+            || lastNumericFieldsFromSchema[0];
+
+        if (defaultField) {
+            chosenNumericFields = [defaultField];
             chosenCategoricalFields = [];
             lastCategoricalFieldsFromSchema = [];
             setSizeState(null, null, null, null);
             await loadSelectedColumns();
+        } else if (lastCategoricalFieldsFromSchema.length > 0) {
+            // Fallback to categorical if no numeric fields are present
+            const defaultCat = lastCategoricalFieldsFromSchema[0];
+            chosenNumericFields = [];
+            chosenCategoricalFields = [defaultCat];
+            setSizeState(null, null, null, null);
+            await loadSelectedColumns();
         } else {
-            alert("Field 'price_m2' was not found in the file.");
+            alert("No displayable numeric or categorical fields were found in the file.");
         }
     } catch (err: any) {
         console.error('Metadata read failed:', err);
@@ -4479,12 +4565,24 @@ fileInput.addEventListener('change', async () => {
 
 // Auto-load default dataset
 async function autoLoadDefaultDataset() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dataParam = urlParams.get('data');
+
+    if (!dataParam) return;
+    
+    // Safety: ensure it's a relative path to a parquet file
+    const lower = dataParam.toLowerCase();
+    if (!(lower.endsWith('.parquet') || lower.endsWith('.geoparquet'))) {
+        console.warn('Unsupported file extension for auto-load:', dataParam);
+        return;
+    }
+
     try {
-        const response = await fetch('./data/babakan_ciparay.parquet');
+        const response = await fetch(`./data/${dataParam}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const blob = await response.blob();
-        const file = new File([blob], 'babakan_ciparay.parquet', {
+        const file = new File([blob], dataParam, {
             type: 'application/octet-stream'
         });
 
