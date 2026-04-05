@@ -19,7 +19,15 @@ const utilOut = path.join(siteOut, "util");
 const PORT = 3000;
 
 async function rmrf(p) {
-  await fs.rm(p, { recursive: true, force: true });
+  try {
+    await fs.rm(p, { recursive: true, force: true });
+  } catch (err) {
+    if (err.code === 'EBUSY') {
+      console.warn(`[WARNING] Resource busy saat menghapus ${p}. Pastikan server lama sudah dimatikan.`);
+    } else {
+      throw err;
+    }
+  }
 }
 
 async function copyDir(src, dest) {
@@ -116,6 +124,22 @@ function startServer(rootDir) {
   console.log("Building viz into:", vizOut);
   run(npmCmd, ["run", "build", "--", "--outDir", vizOut, "--emptyOutDir"], vizSrc);
   console.log("Viz build complete");
+
+  // Generate dataset list manifest
+  try {
+    const dataPath = path.join(vizSrc, "public", "data");
+    const files = await fs.readdir(dataPath);
+    const parquets = files.filter(f => {
+      const ext = f.toLowerCase();
+      return ext.endsWith(".parquet") || ext.endsWith(".geoparquet");
+    });
+    const manifestPath = path.join(vizOut, "data", "datasets.json");
+    await fs.mkdir(path.dirname(manifestPath), { recursive: true });
+    await fs.writeFile(manifestPath, JSON.stringify(parquets, null, 2));
+    console.log("Generated dataset manifest:", manifestPath);
+  } catch (err) {
+    console.warn("Could not generate dataset manifest:", err.message);
+  }
 
   // Serve local-deploy/site
   console.log("Starting local server...");
