@@ -923,7 +923,8 @@ html, body, #app {
         <button id="btnCancelAddLayer" type="button">Cancel</button>
       </div>
 
-      <input id="file" type="file" accept=".parquet,.parq" style="display:none" />
+      <input id="file" type="file" accept=".parquet,.parq" webkitdirectory directory multiple style="display:none" />
+      <input id="fileSingle" type="file" accept=".parquet,.parq,.geoparquet" multiple style="display:none" />
     </div>
   </div>
 

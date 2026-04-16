@@ -690,6 +690,7 @@ document.addEventListener('mouseup', handleLassoMouseUp);
 
 
 const fileInput = document.getElementById('file') as HTMLInputElement;
+const fileInputSingle = document.getElementById('fileSingle') as HTMLInputElement;
 const fieldSelect = document.getElementById('field') as HTMLSelectElement;
 const rampSelect = document.getElementById('ramp') as HTMLSelectElement;
 const enable3DCheckbox = document.getElementById('enable3D') as HTMLInputElement;
@@ -720,7 +721,7 @@ const btnZoomTo = document.getElementById('btn-zoomto') as HTMLButtonElement;
 btnZoomTo.onclick = () => { if (currentGeoJSON) fitToData(currentGeoJSON); };
 if (addLayerFromStoreButton) {
     addLayerFromStoreButton.addEventListener('click', () => {
-        openAddLayerModal();
+        fileInputSingle.click();
     });
 }
 
@@ -969,6 +970,7 @@ type LayerState = {
     legendSortDirection: 'asc' | 'desc';
     customColors: Map<string, string>;
     is3DMode: boolean;
+    geometryType: 'polygon' | 'point' | 'line';
 };
 
 type DataStore = {
@@ -1019,6 +1021,9 @@ let colorBreaks: number[] | null = null;
 // 3D extrusion settings
 let is3DMode = false; // Default to 2D mode
 let cachedExtrusionSettings: { multiplier: number; unit: string } | null = null;
+
+// Geometry type of current layer
+let currentGeometryType: 'polygon' | 'point' | 'line' = 'polygon';
 
 // staged loading
 let lastFile: File | null = null;
@@ -1193,7 +1198,8 @@ function createLayerState(name: string, dataStoreId: string): LayerState {
         legendSortField: 'count',
         legendSortDirection: 'desc',
         customColors: new Map(),
-        is3DMode: false
+        is3DMode: false,
+        geometryType: 'polygon'
     };
 }
 
@@ -1226,6 +1232,7 @@ function persistCurrentLayerState() {
     layer.legendSortDirection = legendSortDirection;
     layer.customColors = customColors;
     layer.is3DMode = is3DMode;
+    layer.geometryType = currentGeometryType;
 }
 
 function applyLayerState(layer: LayerState) {
@@ -1255,6 +1262,7 @@ function applyLayerState(layer: LayerState) {
     customColors = layer.customColors;
     is3DMode = layer.is3DMode;
     currentDataStoreId = layer.dataStoreId;
+    currentGeometryType = layer.geometryType;
     const store = dataStores.get(layer.dataStoreId);
     if (store) {
         lastFile = store.file;
@@ -1302,7 +1310,27 @@ function applyLayerState(layer: LayerState) {
         colorPicker.value = singleColorValue;
     }
 
-    enable3DCheckbox.checked = is3DMode;
+    // Handle 3D/2D constraints based on layer name and geometry type
+    const layerNameLow = layer.name.toLowerCase();
+    const is3DAllowed = currentGeometryType === 'polygon' && !layerNameLow.includes('_2d');
+    const force3D = is3DAllowed && layerNameLow.includes('_3d');
+    const force2DView = layerNameLow.includes('_2d');
+
+    enable3DCheckbox.disabled = !is3DAllowed;
+    if (!is3DAllowed) {
+        // Non-polygon or explicitly 2D: force flat
+        is3DMode = false;
+        enable3DCheckbox.checked = false;
+        if (force2DView) setView('top');
+    } else if (force3D) {
+        // _3d in name: auto-enable 3D
+        is3DMode = true;
+        enable3DCheckbox.checked = true;
+    } else {
+        // Default polygon: restore persisted state
+        enable3DCheckbox.checked = is3DMode;
+    }
+
     updateFieldTypeUI();
     update3DUI();
     updateFloatingLegend();
@@ -2497,34 +2525,32 @@ function applyExtrusionWithCustomColors() {
     const ids = getCurrentLayerIds();
     if (!ids) return;
 
-    // If we have custom colors, we need to rebuild the color expression
     if (customColors.size > 0) {
-        let colorExpr: any;
+        const colorExpr: any = currentFieldType === 'categorical'
+            ? buildCategoricalColorExpression()
+            : buildNumericColorExpression();
 
-        if (currentFieldType === 'categorical') {
-            colorExpr = buildCategoricalColorExpression();
+        if (currentGeometryType === 'point') {
+            map.setPaintProperty(ids.layerId, 'circle-color', colorExpr);
+            map.setPaintProperty(ids.layerId, 'circle-opacity', parseFloat(opacityInput.value));
+        } else if (currentGeometryType === 'line') {
+            map.setPaintProperty(ids.layerId, 'line-color', colorExpr);
+            map.setPaintProperty(ids.layerId, 'line-opacity', parseFloat(opacityInput.value));
         } else {
-            colorExpr = buildNumericColorExpression();
+            map.setPaintProperty(ids.layerId, 'fill-extrusion-color', colorExpr);
+            if (currentFieldType === 'numeric') {
+                const rawMult = Number(multInput.value);
+                const multiplier = Number.isFinite(rawMult) ? rawMult : 0;
+                const unitFactor = UNIT_TO_METERS[unitsSelect.value as keyof typeof UNIT_TO_METERS] ?? 1;
+                const valueExpr = buildValueExpression();
+                const heightExpr: any = is3DMode ? ['*', valueExpr, multiplier * unitFactor] : 0;
+                map.setPaintProperty(ids.layerId, 'fill-extrusion-height', heightExpr);
+            } else {
+                map.setPaintProperty(ids.layerId, 'fill-extrusion-height', 0);
+            }
+            map.setPaintProperty(ids.layerId, 'fill-extrusion-opacity', parseFloat(opacityInput.value));
         }
-
-        map.setPaintProperty(ids.layerId, 'fill-extrusion-color', colorExpr);
-
-        // Apply height and opacity for numeric fields
-        if (currentFieldType === 'numeric') {
-            const rawMult = Number(multInput.value);
-            const multiplier = Number.isFinite(rawMult) ? rawMult : 0;
-            const unitFactor = UNIT_TO_METERS[unitsSelect.value as keyof typeof UNIT_TO_METERS] ?? 1;
-            const valueExpr = buildValueExpression();
-            const heightExpr: any = is3DMode ? ['*', valueExpr, multiplier * unitFactor] : 0;
-
-            map.setPaintProperty(ids.layerId, 'fill-extrusion-height', heightExpr);
-        } else {
-            map.setPaintProperty(ids.layerId, 'fill-extrusion-height', 0);
-        }
-
-        map.setPaintProperty(ids.layerId, 'fill-extrusion-opacity', parseFloat(opacityInput.value));
     } else {
-        // No custom colors, use normal extrusion
         applyExtrusion();
     }
 }
@@ -2922,17 +2948,21 @@ function installWelcome() {
     card.style.cssText = 'background:#fff;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.12);padding:18px 20px;max-width:560px;width:min(92vw,560px);display:grid;gap:12px;text-align:center;';
     card.innerHTML = `
     <div style="font-size:16px;font-weight:600;">Explore GIS Data</div>
-    <div style="color:#666;font-size:13px;">Choose a pre-processed dataset from our gallery or upload your own <code>.parquet</code> file.</div>
+    <div style="color:#666;font-size:13px;">Choose a dataset below or drop a folder containing <code>.parquet</code> files here.</div>
     <div style="margin: 8px 0;">
         <a href="../explorer.html" style="color: #3b82f6; text-decoration: none; font-weight: 600; border: 1px solid #3b82f6; padding: 6px 12px; border-radius: 6px; display: inline-block;">← Back to Gallery</a>
     </div>
+    <div id="welcome-datasets" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:10px 0;">
+        <div class="muted">Loading available datasets...</div>
+    </div>
+    <div class="divider"></div>
     <div style="color:#888;font-size:11px;">TIP: Parcels should have Polygon/MultiPolygon geometry.</div>
   `;
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:10px;justify-content:center;flex-wrap:wrap';
 
     const btnBrowse = document.createElement('button');
-    btnBrowse.textContent = 'Browse GeoParquet…';
+    btnBrowse.textContent = 'Browse for folder…';
     btnBrowse.style.cssText = 'border:1px solid #ddd;background:#f8f8f8;padding:8px 12px;border-radius:10px;cursor:pointer;';
     btnBrowse.onclick = () => fileInput.click();
 
@@ -2940,6 +2970,45 @@ function installWelcome() {
     card.append(row);
     welcomeEl.append(card);
     document.body.append(welcomeEl);
+
+    // Fetch datasets manifest
+    const manifestPaths = ['./data/datasets.json', './public/data/datasets.json'];
+    let manifestLoaded = false;
+
+    async function tryFetchManifest() {
+        const container = document.getElementById('welcome-datasets');
+        if (!container) return;
+
+        for (const path of manifestPaths) {
+            try {
+                const res = await fetch(path);
+                if (res.ok) {
+                    const manifest = await res.json();
+                    container.innerHTML = '';
+                    if (Array.isArray(manifest)) {
+                        manifest.forEach(item => {
+                            const btn = document.createElement('button');
+                            btn.textContent = (item.type === 'folder' ? '📂 ' : '📄 ') + (item.name.replace('.parquet', '').replace('.geoparquet', ''));
+                            btn.style.cssText = 'border:1px solid #3b82f6;background:#eff6ff;color:#1e40af;padding:8px 16px;border-radius:10px;cursor:pointer;font-weight:600;transition:all 0.2s;';
+                            btn.onmouseover = () => { btn.style.background = '#dbeafe'; };
+                            btn.onmouseout = () => { btn.style.background = '#eff6ff'; };
+                            btn.onclick = () => loadRemoteDataset(item);
+                            container.appendChild(btn);
+                        });
+                        manifestLoaded = true;
+                        console.log('Manifest loaded from:', path);
+                        break;
+                    }
+                }
+            } catch (e) { }
+        }
+
+        if (!manifestLoaded) {
+            container.innerHTML = '<div class="muted">Datasets manifest not found. Run build script first.</div>';
+        }
+    }
+
+    tryFetchManifest();
 }
 
 function revealUI() {
@@ -3445,7 +3514,18 @@ async function loadSelectedColumns() {
         if (!fc?.features) throw new Error('Parser returned no FeatureCollection.');
 
         let features = fc.features.filter(f => f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
-        if (features.length === 0) throw new Error('No Polygon/MultiPolygon features found.');
+        let detectedGeomType: 'polygon' | 'point' | 'line' = 'polygon';
+        if (features.length === 0) {
+            // Non-polygon data (points, lines, etc) — use all features as-is
+            const allValid = fc.features.filter(f => f.geometry != null);
+            const hasPoint = allValid.some(f => f.geometry.type === 'Point' || f.geometry.type === 'MultiPoint');
+            detectedGeomType = hasPoint ? 'point' : 'line';
+            console.warn(`No Polygon/MultiPolygon features found; treating as ${detectedGeomType} layer.`);
+            features = allValid;
+        }
+        currentGeometryType = detectedGeomType;
+        const activeLayerRef = getCurrentLayer();
+        if (activeLayerRef) activeLayerRef.geometryType = detectedGeomType;
 
         sanitizeFeaturesInPlace(features);
 
@@ -3513,8 +3593,19 @@ async function loadSelectedColumns() {
         colorMode = 'quantiles';
         rampSelect.value = 'Civic';
 
-        is3DMode = true;
-        enable3DCheckbox.checked = true;
+        // 3D default: only if layer name contains _3d AND geometry is polygon
+        const activeLayer3D = getCurrentLayer();
+        const layerNameFor3D = activeLayer3D?.name?.toLowerCase() ?? '';
+        const should3D = currentGeometryType === 'polygon' && layerNameFor3D.includes('_3d');
+        if (currentGeometryType === 'polygon') {
+            is3DMode = should3D;
+            enable3DCheckbox.checked = should3D;
+            enable3DCheckbox.disabled = false;
+        } else {
+            is3DMode = false;
+            enable3DCheckbox.checked = false;
+            enable3DCheckbox.disabled = true;
+        }
 
         addOrUpdateSource(currentGeoJSON);
         updateFieldTypeUI();
@@ -3523,6 +3614,13 @@ async function loadSelectedColumns() {
         // showPaint(); // REMOVED: Don't show paint initially
 
         fitToData(currentGeoJSON);
+
+        // Enforce top view for _2d layers (fitToData may override camera)
+        const curLayer = getCurrentLayer();
+        if (curLayer && curLayer.name.toLowerCase().includes('_2d')) {
+            setView('top');
+        }
+
         persistCurrentLayerState();
     } catch (err: any) {
         console.error('GeoParquet load failed:', err);
@@ -3586,12 +3684,48 @@ function addOrUpdateSource(fc: GeoJSON.FeatureCollection) {
         existing.setData(fc);
     } else {
         map.addSource(layer.sourceId, { type: 'geojson', data: fc });
-        addExtrusionLayer(layer);
+        if (layer.geometryType === 'point') {
+            addCircleLayer(layer);
+        } else if (layer.geometryType === 'line') {
+            addLineLayer(layer);
+        } else {
+            addExtrusionLayer(layer);
+        }
     }
     awaitFirstRenderedFeature(layer.layerId);
 }
 
 let keyHandlersInstalled = false;
+
+function addCircleLayer(layer: LayerState) {
+    if (map.getLayer(layer.layerId)) return;
+    map.addLayer({
+        id: layer.layerId, type: 'circle', source: layer.sourceId,
+        paint: {
+            'circle-color': '#888',
+            'circle-radius': 6,
+            'circle-opacity': parseFloat(opacityInput.value),
+            'circle-stroke-width': 1,
+            'circle-stroke-color': '#fff'
+        }
+    });
+    setLayerVisibility(layer, layer.visible);
+    _installLayerEventHandlers(layer);
+}
+
+function addLineLayer(layer: LayerState) {
+    if (map.getLayer(layer.layerId)) return;
+    map.addLayer({
+        id: layer.layerId, type: 'line', source: layer.sourceId,
+        paint: {
+            'line-color': '#888',
+            'line-width': 2,
+            'line-opacity': parseFloat(opacityInput.value)
+        }
+    });
+    setLayerVisibility(layer, layer.visible);
+    _installLayerEventHandlers(layer);
+}
 
 function addExtrusionLayer(layer: LayerState) {
     if (map.getLayer(layer.layerId)) return;
@@ -3605,8 +3739,11 @@ function addExtrusionLayer(layer: LayerState) {
         }
     });
     setLayerVisibility(layer, layer.visible);
+    _installLayerEventHandlers(layer);
+}
 
-    // NEW: parcel selection and inspection
+function _installLayerEventHandlers(layer: LayerState) {
+    // Parcel selection and inspection
     map.on('click', layer.layerId, (e) => {
         const f = e.features?.[0];
         if (!f) return;
@@ -3767,10 +3904,17 @@ function applyGrayRendering() {
     const ids = getCurrentLayerIds();
     if (!ids) return;
 
-    // Apply gray color and no extrusion when no field is selected
-    map.setPaintProperty(ids.layerId, 'fill-extrusion-color', '#888');
-    map.setPaintProperty(ids.layerId, 'fill-extrusion-height', 0);
-    map.setPaintProperty(ids.layerId, 'fill-extrusion-opacity', parseFloat(opacityInput.value));
+    if (currentGeometryType === 'point') {
+        map.setPaintProperty(ids.layerId, 'circle-color', '#888');
+        map.setPaintProperty(ids.layerId, 'circle-opacity', parseFloat(opacityInput.value));
+    } else if (currentGeometryType === 'line') {
+        map.setPaintProperty(ids.layerId, 'line-color', '#888');
+        map.setPaintProperty(ids.layerId, 'line-opacity', parseFloat(opacityInput.value));
+    } else {
+        map.setPaintProperty(ids.layerId, 'fill-extrusion-color', '#888');
+        map.setPaintProperty(ids.layerId, 'fill-extrusion-height', 0);
+        map.setPaintProperty(ids.layerId, 'fill-extrusion-opacity', parseFloat(opacityInput.value));
+    }
 
     // Clear any filters
     map.setFilter(ids.layerId, null);
@@ -3795,26 +3939,38 @@ function applyExtrusion() {
         return;
     }
 
-    if (currentFieldType === 'categorical') {
-        // For categorical fields, no extrusion - just color
-        const colorExpr = buildCategoricalColorExpression();
-
-        map.setPaintProperty(ids.layerId, 'fill-extrusion-color', colorExpr);
-        map.setPaintProperty(ids.layerId, 'fill-extrusion-height', 0);
-        map.setPaintProperty(ids.layerId, 'fill-extrusion-opacity', parseFloat(opacityInput.value));
+    if (currentGeometryType === 'point') {
+        // --- POINT layer ---
+        const colorExpr = currentFieldType === 'categorical'
+            ? buildCategoricalColorExpression()
+            : buildNumericColorExpression();
+        map.setPaintProperty(ids.layerId, 'circle-color', colorExpr);
+        map.setPaintProperty(ids.layerId, 'circle-opacity', parseFloat(opacityInput.value));
+    } else if (currentGeometryType === 'line') {
+        // --- LINE layer ---
+        const colorExpr = currentFieldType === 'categorical'
+            ? buildCategoricalColorExpression()
+            : buildNumericColorExpression();
+        map.setPaintProperty(ids.layerId, 'line-color', colorExpr);
+        map.setPaintProperty(ids.layerId, 'line-opacity', parseFloat(opacityInput.value));
     } else {
-        // For numeric fields, use the new color expression builder
-        const colorExpr = buildNumericColorExpression();
-        const valueExpr = buildValueExpression();
-
-        const rawMult = Number(multInput.value);
-        const multiplier = Number.isFinite(rawMult) ? rawMult : 0;
-        const unitFactor = UNIT_TO_METERS[unitsSelect.value as keyof typeof UNIT_TO_METERS] ?? 1;
-        const heightExpr: Expression = is3DMode ? ['*', valueExpr, multiplier * unitFactor] as any : 0;
-
-        map.setPaintProperty(ids.layerId, 'fill-extrusion-color', colorExpr);
-        map.setPaintProperty(ids.layerId, 'fill-extrusion-height', heightExpr);
-        map.setPaintProperty(ids.layerId, 'fill-extrusion-opacity', parseFloat(opacityInput.value));
+        // --- POLYGON (fill-extrusion) layer ---
+        if (currentFieldType === 'categorical') {
+            const colorExpr = buildCategoricalColorExpression();
+            map.setPaintProperty(ids.layerId, 'fill-extrusion-color', colorExpr);
+            map.setPaintProperty(ids.layerId, 'fill-extrusion-height', 0);
+            map.setPaintProperty(ids.layerId, 'fill-extrusion-opacity', parseFloat(opacityInput.value));
+        } else {
+            const colorExpr = buildNumericColorExpression();
+            const valueExpr = buildValueExpression();
+            const rawMult = Number(multInput.value);
+            const multiplier = Number.isFinite(rawMult) ? rawMult : 0;
+            const unitFactor = UNIT_TO_METERS[unitsSelect.value as keyof typeof UNIT_TO_METERS] ?? 1;
+            const heightExpr: Expression = is3DMode ? ['*', valueExpr, multiplier * unitFactor] as any : 0;
+            map.setPaintProperty(ids.layerId, 'fill-extrusion-color', colorExpr);
+            map.setPaintProperty(ids.layerId, 'fill-extrusion-height', heightExpr);
+            map.setPaintProperty(ids.layerId, 'fill-extrusion-opacity', parseFloat(opacityInput.value));
+        }
     }
 
     // refresh which features are flagged as erroneous for current mode
@@ -4382,7 +4538,8 @@ function onMultInput() {
 
 
 function update3DUI() {
-    if (currentFieldType === 'numeric') {
+    // Only show extrusion options for polygon layers with a numeric field in 3D mode
+    if (currentGeometryType === 'polygon' && currentFieldType === 'numeric') {
         extrusionOptions.style.display = is3DMode ? 'grid' : 'none';
     } else {
         extrusionOptions.style.display = 'none';
@@ -4453,7 +4610,7 @@ function updateFieldTypeUI() {
 /* ---------------- Events ---------------- */
 
 if (btnBrowseDataSource) {
-    btnBrowseDataSource.addEventListener('click', () => fileInput.click());
+    btnBrowseDataSource.addEventListener('click', () => fileInputSingle.click());
 }
 
 if (btnCancelAddLayer) {
@@ -4558,9 +4715,83 @@ async function handleSelectedFile(file: File) {
 
 // Manual browse
 fileInput.addEventListener('change', async () => {
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    await handleSelectedFile(file);
+    const files = Array.from(fileInput.files || []);
+    const supported = files.filter(f => {
+        const lower = f.name.toLowerCase();
+        return lower.endsWith('.parquet') || lower.endsWith('.parq') || lower.endsWith('.geoparquet');
+    });
+
+    // Sort to ensure consistent layer order
+    supported.sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const file of supported) {
+        await handleSelectedFile(file);
+    }
+});
+
+fileInputSingle.addEventListener('change', async () => {
+    const files = Array.from(fileInputSingle.files || []);
+    const supported = files.filter(f => {
+        const lower = f.name.toLowerCase();
+        return lower.endsWith('.parquet') || lower.endsWith('.parq') || lower.endsWith('.geoparquet');
+    });
+
+    supported.sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const file of supported) {
+        await handleSelectedFile(file);
+    }
+});
+
+// Drag and drop support for folders
+window.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+});
+
+window.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!e.dataTransfer) return;
+
+    const items = Array.from(e.dataTransfer.items || []);
+    const files: File[] = [];
+
+    // Helper functions to traverse entries
+    async function traverseEntry(entry: any) {
+        if (entry.isFile) {
+            const file = await new Promise<File>((resolve) => entry.file(resolve));
+            const lower = file.name.toLowerCase();
+            if (lower.endsWith('.parquet') || lower.endsWith('.parq') || lower.endsWith('.geoparquet')) {
+                files.push(file);
+            }
+        } else if (entry.isDirectory) {
+            const reader = entry.createReader();
+            const entries = await new Promise<any[]>((resolve) => reader.readEntries(resolve));
+            for (const child of entries) {
+                await traverseEntry(child);
+            }
+        }
+    }
+
+    for (const item of items) {
+        if (item.kind === 'file') {
+            const entry = item.webkitGetAsEntry();
+            if (entry) {
+                await traverseEntry(entry);
+            }
+        }
+    }
+
+    if (files.length > 0) {
+        // Sort files to ensure consistent layer order
+        files.sort((a, b) => a.name.localeCompare(b.name));
+        for (const file of files) {
+            await handleSelectedFile(file);
+        }
+    }
 });
 
 // Auto-load default dataset
@@ -4569,26 +4800,58 @@ async function autoLoadDefaultDataset() {
     const dataParam = urlParams.get('data');
 
     if (!dataParam) return;
-    
-    // Safety: ensure it's a relative path to a parquet file
-    const lower = dataParam.toLowerCase();
-    if (!(lower.endsWith('.parquet') || lower.endsWith('.geoparquet'))) {
-        console.warn('Unsupported file extension for auto-load:', dataParam);
-        return;
-    }
 
     try {
-        const response = await fetch(`./data/${dataParam}`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        // Fetch manifest to determine type
+        const manifestRes = await fetch('./data/datasets.json');
+        if (!manifestRes.ok) throw new Error('Could not load datasets.json');
+        const manifest = await manifestRes.json();
 
-        const blob = await response.blob();
-        const file = new File([blob], dataParam, {
-            type: 'application/octet-stream'
-        });
-
-        await handleSelectedFile(file);
+        const item = manifest.find((i: any) => i.name === dataParam);
+        if (item) {
+            await loadRemoteDataset(item);
+        } else {
+            console.warn('Dataset not found in manifest:', dataParam);
+        }
     } catch (err) {
         console.error('Auto load dataset failed:', err);
+    }
+}
+
+async function loadRemoteDataset(item: any) {
+    showLoading(`Loading ${item.name}...`);
+    try {
+        const filePaths = item.type === 'folder' ? item.files : [item.path];
+
+        for (const relPath of filePaths) {
+            // Try deployment path and source path fallbacks
+            const paths = [`./data/${relPath}`, `./public/data/${relPath}`];
+            let blob = null;
+
+            for (const p of paths) {
+                try {
+                    const res = await fetch(p);
+                    if (res.ok) {
+                        blob = await res.blob();
+                        break;
+                    }
+                } catch (e) { }
+            }
+
+            if (!blob) throw new Error(`Could not load data for ${relPath}`);
+
+            const fileName = relPath.split('/').pop() || relPath;
+            const file = new File([blob], fileName, {
+                type: 'application/octet-stream'
+            });
+
+            await handleSelectedFile(file);
+        }
+    } catch (err: any) {
+        console.error('Remote load failed:', err);
+        alert(`Failed to load remote dataset: ${err.message}`);
+    } finally {
+        hideLoading();
     }
 }
 

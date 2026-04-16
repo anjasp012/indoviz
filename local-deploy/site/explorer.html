@@ -104,18 +104,10 @@
           ← Back to Homepage
         </a>
         <h1>Choose a Dataset</h1>
-        <p>Select a pre-processed dataset or upload your own to visualize in 3D.</p>
+        <p>Select a pre-processed dataset to visualize in 3D.</p>
         
         <div id="explorer-grid" class="explorer-grid">
             <!-- Cards will be added here dynamically -->
-        </div>
-
-        <div style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
-            <h3>Upload Your Own</h3>
-            <p>Have your own GeoParquet or ESRI Shapefile? Upload it directly and start exploring immediately.</p>
-            <div style="margin-top: 15px;">
-                <a href="viz/" class="btn-viz btn-upload" style="max-width: 300px;">Open Visualizer</a>
-            </div>
         </div>
       </div>
     </main>
@@ -129,29 +121,47 @@
 
     async function loadDatasets() {
         const grid = document.getElementById('explorer-grid');
+        const paths = ['viz/data/datasets.json', '../viz/public/data/datasets.json'];
+        
+        let manifest = null;
+        for (const path of paths) {
+            try {
+                const res = await fetch(path);
+                if (res.ok) {
+                    manifest = await res.json();
+                    console.log('Loaded manifest from:', path);
+                    break;
+                }
+            } catch(e) {}
+        }
+
+        if (!manifest) {
+            grid.innerHTML = '<p class="muted">Datasets manifest not found. Please run <code>node deploy-local.js</code> first.</p>';
+            return;
+        }
+
         try {
-            const response = await fetch('viz/data/datasets.json');
-            if (!response.ok) throw new Error('Could not load datasets.json');
-            const files = await response.json();
-            
-            if (files.length === 0) {
+            if (manifest.length === 0) {
                 grid.innerHTML = '<p class="muted">No datasets found in the data directory.</p>';
                 return;
             }
 
-            files.forEach(filename => {
+            manifest.forEach(item => {
                 const card = document.createElement('article');
                 card.className = 'data-card';
                 
+                const itemName = item.name;
+                const isFolder = item.type === 'folder';
+
                 // Try to make a pretty title and select an image
-                let title = filename.replace('.geoparquet', '').replace('.parquet', '').split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                let title = itemName.replace('.geoparquet', '').replace('.parquet', '').split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                 let imageUrl = 'https://images.unsplash.com/photo-1541339907198-e08756eaaaf8?q=80&w=400&h=200&fit=crop'; // Default: Bandung
 
-                if (filename.includes('babakan')) {
+                if (itemName.includes('babakan')) {
                     imageUrl = 'https://images.unsplash.com/photo-1577086664693-894d8405334a?q=80&w=400&h=200&fit=crop';
-                } else if (filename.includes('submarket')) {
+                } else if (itemName.includes('submarket')) {
                     imageUrl = 'https://images.unsplash.com/photo-1526948531399-320e7e40f0ca?q=80&w=400&h=200&fit=crop';
-                } else if (filename.includes('jakarta')) {
+                } else if (itemName.includes('jakarta')) {
                     imageUrl = 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?q=80&w=400&h=200&fit=crop';
                 }
 
@@ -160,10 +170,10 @@
                         <img src="${imageUrl}" alt="${title}">
                     </div>
                     <div class="content">
-                        <h3>${title}</h3>
-                        <p>3D Visualization of ${title} geospatial data parcels and property metrics.</p>
+                        <h3>${isFolder ? '📂 ' : '📄 '}${title}</h3>
+                        <p>${isFolder ? 'Collection of' : '3D Visualization of'} ${title} geospatial data.</p>
                         <div class="btn-row">
-                            <a href="viz/?data=${filename}" class="btn-viz">Visualize in 3D</a>
+                            <a href="viz/?data=${itemName}" class="btn-viz">Visualize in 3D</a>
                         </div>
                     </div>
                 `;

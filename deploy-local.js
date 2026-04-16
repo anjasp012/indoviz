@@ -16,7 +16,7 @@ const siteOut = path.join(deployDir, "site");
 const vizOut = path.join(siteOut, "viz");
 const utilOut = path.join(siteOut, "util");
 
-const PORT = 3000;
+const PORT = 3001;
 
 async function rmrf(p) {
   try {
@@ -128,15 +128,48 @@ function startServer(rootDir) {
   // Generate dataset list manifest
   try {
     const dataPath = path.join(vizSrc, "public", "data");
-    const files = await fs.readdir(dataPath);
-    const parquets = files.filter(f => {
-      const ext = f.toLowerCase();
-      return ext.endsWith(".parquet") || ext.endsWith(".geoparquet");
-    });
+    const entries = await fs.readdir(dataPath, { withFileTypes: true });
+    const manifest = [];
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const subPath = path.join(dataPath, entry.name);
+        const subFiles = await fs.readdir(subPath);
+        const parquets = subFiles.filter(f => {
+          const ext = f.toLowerCase();
+          return ext.endsWith(".parquet") || ext.endsWith(".geoparquet");
+        });
+        if (parquets.length > 0) {
+          manifest.push({
+            type: "folder",
+            name: entry.name,
+            files: parquets.map(f => `${entry.name}/${f}`)
+          });
+        }
+      } else if (entry.isFile()) {
+        const ext = entry.name.toLowerCase();
+        if (ext.endsWith(".parquet") || ext.endsWith(".geoparquet")) {
+          manifest.push({
+            type: "file",
+            name: entry.name,
+            path: entry.name
+          });
+        }
+      }
+    }
+
+    const manifestContent = JSON.stringify(manifest, null, 2);
+    
+    // 1. Write to source (for development / npm run dev)
+    const srcManifestPath = path.join(dataPath, "datasets.json");
+    await fs.writeFile(srcManifestPath, manifestContent);
+    console.log("Generated source manifest:", srcManifestPath);
+
+    // 2. Write to deployment (for full deploy test)
     const manifestPath = path.join(vizOut, "data", "datasets.json");
     await fs.mkdir(path.dirname(manifestPath), { recursive: true });
-    await fs.writeFile(manifestPath, JSON.stringify(parquets, null, 2));
-    console.log("Generated dataset manifest:", manifestPath);
+    await fs.writeFile(manifestPath, manifestContent);
+    console.log("Generated deployment manifest:", manifestPath);
   } catch (err) {
     console.warn("Could not generate dataset manifest:", err.message);
   }
