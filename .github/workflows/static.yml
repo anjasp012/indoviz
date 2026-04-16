@@ -44,8 +44,29 @@ jobs:
 
       - name: Generate dataset list
         run: |
-          node -e 'const fs = require("fs"); const files = fs.readdirSync("viz/public/data"); const parquets = files.filter(f => { const ext = f.toLowerCase(); return ext.endsWith(".parquet") || ext.endsWith(".geoparquet"); }); fs.mkdirSync("dist/viz/data", { recursive: true }); fs.writeFileSync("dist/viz/data/datasets.json", JSON.stringify(parquets, null, 2));'
-
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const dataPath = "viz/public/data";
+            const entries = fs.readdirSync(dataPath, { withFileTypes: true });
+            const manifest = [];
+            for (const entry of entries) {
+              if (entry.isDirectory()) {
+                const subPath = path.join(dataPath, entry.name);
+                const subFiles = fs.readdirSync(subPath);
+                const parquets = subFiles.filter(f => f.toLowerCase().endsWith(".parquet") || f.toLowerCase().endsWith(".geoparquet"));
+                if (parquets.length > 0) {
+                  manifest.push({ type: "folder", name: entry.name, files: parquets.map(f => `${entry.name}/${f}`) });
+                }
+              } else if (entry.isFile()) {
+                if (entry.name.toLowerCase().endsWith(".parquet") || entry.name.toLowerCase().endsWith(".geoparquet")) {
+                  manifest.push({ type: "file", name: entry.name, path: entry.name });
+                }
+              }
+            }
+            fs.mkdirSync("dist/viz/data", { recursive: true });
+            fs.writeFileSync("dist/viz/data/datasets.json", JSON.stringify(manifest, null, 2));
+          '
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

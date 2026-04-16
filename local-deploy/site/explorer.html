@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Explorer | Put It On A Map</title>
-  <link rel="shortcut icon" type="image/x-icon" href="images/favicon.ico"/>
+  <link rel="shortcut icon" type="image/x-icon" href="images/favicon.ico" />
   <link rel="stylesheet" href="shared.css" />
   <link rel="stylesheet" href="main.css" />
   <style>
@@ -14,6 +15,7 @@
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       margin-top: 40px;
     }
+
     .data-card {
       position: relative;
       background: var(--card);
@@ -26,11 +28,13 @@
       height: 100%;
       transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     }
+
     .data-card:hover {
       transform: translateY(-4px);
-      box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
       border-color: var(--accent);
     }
+
     .data-card .thumb {
       height: 160px;
       background: #f0f0f0;
@@ -39,21 +43,36 @@
       justify-content: center;
       overflow: hidden;
     }
+
     .data-card .thumb img {
       width: 100%;
       height: 100%;
       object-fit: cover;
     }
+
     .data-card .content {
       padding: 20px;
       display: flex;
       flex-direction: column;
       flex: 1;
     }
-    .data-card h3 { margin: 0 0 8px; font-size: 1.1rem; }
-    .data-card p { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.5; }
-    .data-card .btn-row { margin-top: 20px; }
-    
+
+    .data-card h3 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+
+    .data-card p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .data-card .btn-row {
+      margin-top: 20px;
+    }
+
     .btn-viz {
       display: block;
       width: 100%;
@@ -66,28 +85,39 @@
       border-radius: 10px;
       transition: background 0.2s ease;
     }
-    .btn-viz:hover { background: #3566cb; }
+
+    .btn-viz:hover {
+      background: #3566cb;
+    }
 
     .btn-upload {
       border: 2px dashed #ccc;
       background: #fafafa;
       color: #666;
     }
-    .btn-upload:hover { border-color: var(--accent); color: var(--accent); }
-    
-    .back-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        text-decoration: none;
-        color: var(--muted);
-        font-size: 0.9rem;
-        margin-bottom: 24px;
-        font-weight: 500;
+
+    .btn-upload:hover {
+      border-color: var(--accent);
+      color: var(--accent);
     }
-    .back-link:hover { color: var(--accent); }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+      font-weight: 500;
+    }
+
+    .back-link:hover {
+      color: var(--accent);
+    }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <header>
@@ -104,68 +134,68 @@
           ← Back to Homepage
         </a>
         <h1>Choose a Dataset</h1>
-        <p>Select a pre-processed dataset to visualize in 3D.</p>
-        
+        <p>Select a pre-processed dataset to visualize.</p>
+
         <div id="explorer-grid" class="explorer-grid">
-            <!-- Cards will be added here dynamically -->
+          <!-- Cards will be added here dynamically -->
         </div>
       </div>
     </main>
     <footer>
-    © <span id="y"></span> Arsip Indoviz<br>
-    Brought to you by the Center for Land Economics
+      © <span id="y"></span> Arsip Indoviz<br>
+      Brought to you by the Center for Land Economics
     </footer>
   </div>
   <script>
     document.getElementById('y').textContent = new Date().getFullYear();
 
     async function loadDatasets() {
-        const grid = document.getElementById('explorer-grid');
-        const paths = ['viz/data/datasets.json', '../viz/public/data/datasets.json'];
-        
-        let manifest = null;
-        for (const path of paths) {
-            try {
-                const res = await fetch(path);
-                if (res.ok) {
-                    manifest = await res.json();
-                    console.log('Loaded manifest from:', path);
-                    break;
-                }
-            } catch(e) {}
-        }
+      const grid = document.getElementById('explorer-grid');
+      const paths = ['viz/data/datasets.json', '../viz/public/data/datasets.json'];
 
-        if (!manifest) {
-            grid.innerHTML = '<p class="muted">Datasets manifest not found. Please run <code>node deploy-local.js</code> first.</p>';
-            return;
-        }
-
+      let manifest = null;
+      for (const path of paths) {
         try {
-            if (manifest.length === 0) {
-                grid.innerHTML = '<p class="muted">No datasets found in the data directory.</p>';
-                return;
-            }
+          const res = await fetch(path);
+          if (res.ok) {
+            manifest = await res.json();
+            console.log('Loaded manifest from:', path);
+            break;
+          }
+        } catch (e) { }
+      }
 
-            manifest.forEach(item => {
-                const card = document.createElement('article');
-                card.className = 'data-card';
-                
-                const itemName = item.name;
-                const isFolder = item.type === 'folder';
+      if (!manifest) {
+        grid.innerHTML = '<p class="muted">Datasets manifest not found. Please run <code>node deploy-local.js</code> first.</p>';
+        return;
+      }
 
-                // Try to make a pretty title and select an image
-                let title = itemName.replace('.geoparquet', '').replace('.parquet', '').split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                let imageUrl = 'https://images.unsplash.com/photo-1541339907198-e08756eaaaf8?q=80&w=400&h=200&fit=crop'; // Default: Bandung
+      try {
+        if (manifest.length === 0) {
+          grid.innerHTML = '<p class="muted">No datasets found in the data directory.</p>';
+          return;
+        }
 
-                if (itemName.includes('babakan')) {
-                    imageUrl = 'https://images.unsplash.com/photo-1577086664693-894d8405334a?q=80&w=400&h=200&fit=crop';
-                } else if (itemName.includes('submarket')) {
-                    imageUrl = 'https://images.unsplash.com/photo-1526948531399-320e7e40f0ca?q=80&w=400&h=200&fit=crop';
-                } else if (itemName.includes('jakarta')) {
-                    imageUrl = 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?q=80&w=400&h=200&fit=crop';
-                }
+        manifest.forEach(item => {
+          const card = document.createElement('article');
+          card.className = 'data-card';
 
-                card.innerHTML = `
+          const itemName = item.name;
+          const isFolder = item.type === 'folder';
+
+          // Try to make a pretty title and select an image
+          let title = itemName.replace('.geoparquet', '').replace('.parquet', '').split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          let imageUrl = 'https://images.unsplash.com/photo-1541339907198-e08756eaaaf8?q=80&w=400&h=200&fit=crop'; // Default: Bandung
+
+          if (itemName.includes('babakan')) {
+            imageUrl = 'https://images.unsplash.com/photo-1577086664693-894d8405334a?q=80&w=400&h=200&fit=crop';
+          } else if (itemName.includes('submarket')) {
+            imageUrl = 'https://images.unsplash.com/photo-1526948531399-320e7e40f0ca?q=80&w=400&h=200&fit=crop';
+          } else if (itemName.includes('jakarta')) {
+            imageUrl = 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?q=80&w=400&h=200&fit=crop';
+          }
+
+          card.innerHTML = `
                     <div class="thumb">
                         <img src="${imageUrl}" alt="${title}">
                     </div>
@@ -177,15 +207,16 @@
                         </div>
                     </div>
                 `;
-                grid.appendChild(card);
-            });
-        } catch (err) {
-            console.error(err);
-            grid.innerHTML = '<p class="muted">Datasets manifest not found. Please run build script first.</p>';
-        }
+          grid.appendChild(card);
+        });
+      } catch (err) {
+        console.error(err);
+        grid.innerHTML = '<p class="muted">Datasets manifest not found. Please run build script first.</p>';
+      }
     }
 
     loadDatasets();
   </script>
 </body>
+
 </html>

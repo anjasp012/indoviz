@@ -7,7 +7,8 @@
       "mobility_2d/landsub.parquet",
       "mobility_2d/pump.parquet",
       "mobility_2d/dike.parquet",
-      "mobility_2d/mobility_pt.parquet"
+      "mobility_2d/mobility_pt.parquet",
+      "mobility_2d/mobility_line.parquet"
     ]
   },
   {
