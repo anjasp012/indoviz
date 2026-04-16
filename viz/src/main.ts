@@ -1310,8 +1310,11 @@ function applyLayerState(layer: LayerState) {
         colorPicker.value = singleColorValue;
     }
 
-    // Handle 3D/2D constraints based on layer name and geometry type
-    const layerNameLow = layer.name.toLowerCase();
+    // Handle 3D/2D constraints based on layer name and URL params (folder name)
+    const urlParams = new URLSearchParams(window.location.search);
+    const dataParam = (urlParams.get('data') || '').toLowerCase();
+    const layerNameLow = layer.name.toLowerCase() + " " + dataParam;
+    
     const is3DAllowed = currentGeometryType === 'polygon' && !layerNameLow.includes('_2d');
     const force3D = is3DAllowed && layerNameLow.includes('_3d');
     const force2DView = layerNameLow.includes('_2d');
@@ -3593,9 +3596,12 @@ async function loadSelectedColumns() {
         colorMode = 'quantiles';
         rampSelect.value = 'Civic';
 
-        // 3D default: only if layer name contains _3d AND geometry is polygon
+        // 3D default: only if layer name or folder name contains _3d AND geometry is polygon
         const activeLayer3D = getCurrentLayer();
-        const layerNameFor3D = activeLayer3D?.name?.toLowerCase() ?? '';
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataParam = (urlParams.get('data') || '').toLowerCase();
+        const layerNameFor3D = (activeLayer3D?.name?.toLowerCase() ?? '') + " " + dataParam;
+        
         const should3D = currentGeometryType === 'polygon' && layerNameFor3D.includes('_3d');
         if (currentGeometryType === 'polygon') {
             is3DMode = should3D;
@@ -4160,7 +4166,10 @@ function fitToData(fc: GeoJSON.FeatureCollection) {
     const b = bbox(fc); if (!b) return;
     
     const curLayer = getCurrentLayer();
-    const is2DOnly = curLayer && curLayer.name.toLowerCase().includes('_2d');
+    const urlParams = new URLSearchParams(window.location.search);
+    const dataParam = (urlParams.get('data') || '').toLowerCase();
+    const nameToCheck = (curLayer?.name?.toLowerCase() ?? '') + " " + dataParam;
+    const is2DOnly = nameToCheck.includes('_2d');
     
     const options: any = { padding: 40, duration: 800 };
     if (is2DOnly) {
