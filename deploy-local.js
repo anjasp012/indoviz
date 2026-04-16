@@ -139,11 +139,16 @@ function startServer(rootDir) {
           const ext = f.toLowerCase();
           return ext.endsWith(".parquet") || ext.endsWith(".geoparquet");
         });
+        const thumbnailFile = subFiles.find(f => {
+          const name = f.toLowerCase();
+          return name.startsWith("thumbnail.") && (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".gif") || name.endsWith(".webp"));
+        });
         if (parquets.length > 0) {
           manifest.push({
             type: "folder",
             name: entry.name,
-            files: parquets.map(f => `${entry.name}/${f}`)
+            files: parquets.map(f => `${entry.name}/${f}`),
+            thumbnail: thumbnailFile ? `viz/data/${entry.name}/${thumbnailFile}` : null
           });
         }
       } else if (entry.isFile()) {

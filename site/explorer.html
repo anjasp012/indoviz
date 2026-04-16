@@ -187,12 +187,9 @@
           let title = itemName.replace('.geoparquet', '').replace('.parquet', '').split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
           let imageUrl = 'https://images.unsplash.com/photo-1541339907198-e08756eaaaf8?q=80&w=400&h=200&fit=crop'; // Default: Bandung
 
-          if (itemName.includes('babakan')) {
-            imageUrl = 'https://images.unsplash.com/photo-1577086664693-894d8405334a?q=80&w=400&h=200&fit=crop';
-          } else if (itemName.includes('submarket')) {
-            imageUrl = 'https://images.unsplash.com/photo-1526948531399-320e7e40f0ca?q=80&w=400&h=200&fit=crop';
-          } else if (itemName.includes('jakarta')) {
-            imageUrl = 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?q=80&w=400&h=200&fit=crop';
+          if (item.thumbnail) {
+            // Adjust thumbnail path depending on development vs deployment mode
+            imageUrl = window.location.pathname.includes('/site') ? '../' + item.thumbnail.replace('viz/data', 'viz/public/data') : item.thumbnail;
           }
 
           card.innerHTML = `

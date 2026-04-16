@@ -3614,13 +3614,6 @@ async function loadSelectedColumns() {
         // showPaint(); // REMOVED: Don't show paint initially
 
         fitToData(currentGeoJSON);
-
-        // Enforce top view for _2d layers (fitToData may override camera)
-        const curLayer = getCurrentLayer();
-        if (curLayer && curLayer.name.toLowerCase().includes('_2d')) {
-            setView('top');
-        }
-
         persistCurrentLayerState();
     } catch (err: any) {
         console.error('GeoParquet load failed:', err);
@@ -4165,7 +4158,17 @@ function buildCategoricalColorExpression(): Expression {
 
 function fitToData(fc: GeoJSON.FeatureCollection) {
     const b = bbox(fc); if (!b) return;
-    map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 40, duration: 800 });
+    
+    const curLayer = getCurrentLayer();
+    const is2DOnly = curLayer && curLayer.name.toLowerCase().includes('_2d');
+    
+    const options: any = { padding: 40, duration: 800 };
+    if (is2DOnly) {
+        options.pitch = 0;
+        options.bearing = 0;
+    }
+    
+    map.fitBounds([[b[0], b[1]], [b[2], b[3]]], options);
 }
 
 // ---- Quality toggle (runtime supersampling) ----
