@@ -4171,10 +4171,13 @@ function fitToData(fc: GeoJSON.FeatureCollection) {
     const nameToCheck = (curLayer?.name?.toLowerCase() ?? '') + " " + dataParam;
     const is2DOnly = nameToCheck.includes('_2d');
     
-    const options: any = { padding: 40, duration: 800 };
+    const options: any = { duration: 800 };
     if (is2DOnly) {
         options.pitch = 0;
         options.bearing = 0;
+        options.padding = 120; // Zoom out more for 2D view
+    } else {
+        options.padding = 40;
     }
     
     map.fitBounds([[b[0], b[1]], [b[2], b[3]]], options);
