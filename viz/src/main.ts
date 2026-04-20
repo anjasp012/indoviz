@@ -48,6 +48,19 @@ map.on('load', () => {
             map.setLayoutProperty(layer.id, 'visibility', 'none');
         }
     });
+    
+    // Create a square icon for point rendering (SDF for tinting)
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, size, size);
+        const imageData = ctx.getImageData(0, 0, size, size);
+        map.addImage('white-square', imageData, { sdf: true });
+    }
 });
 /* ---------------- Cursor Management ---------------- */
 
@@ -971,6 +984,8 @@ type LayerState = {
     customColors: Map<string, string>;
     is3DMode: boolean;
     geometryType: 'polygon' | 'point' | 'line';
+    opacity: number;
+    isFloodStyle: boolean;
 };
 
 type DataStore = {
@@ -1181,7 +1196,9 @@ function createLayerState(name: string, dataStoreId: string): LayerState {
         colorMode: 'quantiles',
         categoricalColorMode: 'random',
         singleColorValue: '#3b82f6',
-        ramp: rampSelect?.value ?? 'Viridis',
+        ramp: (name.toLowerCase().includes('mobility')) ? 'Mobility' : ((name.toLowerCase().includes('_2d') || (new URLSearchParams(window.location.search).get('data') || '').toLowerCase().includes('_2d')) ? 'Flood' : (rampSelect?.value ?? 'Viridis')),
+        opacity: (name.toLowerCase().includes('_2d') || (new URLSearchParams(window.location.search).get('data') || '').toLowerCase().includes('_2d')) ? 0.6 : 1.0,
+        isFloodStyle: (name.toLowerCase().includes('_2d') || (new URLSearchParams(window.location.search).get('data') || '').toLowerCase().includes('_2d')),
         colorDomain: null,
         colorBreaks: null,
         cachedExtrusionSettings: null,
@@ -1233,6 +1250,9 @@ function persistCurrentLayerState() {
     layer.customColors = customColors;
     layer.is3DMode = is3DMode;
     layer.geometryType = currentGeometryType;
+    layer.opacity = parseFloat(opacityInput.value);
+    // Explicitly update isFloodStyle if name changed (usually not, but for safety)
+    layer.isFloodStyle = layer.name.toLowerCase().includes('_2d');
 }
 
 function applyLayerState(layer: LayerState) {
@@ -1263,6 +1283,10 @@ function applyLayerState(layer: LayerState) {
     is3DMode = layer.is3DMode;
     currentDataStoreId = layer.dataStoreId;
     currentGeometryType = layer.geometryType;
+    if (opacityInput) {
+        opacityInput.value = (layer.opacity ?? 1.0).toString();
+        if (opacityOut) opacityOut.value = Number(opacityInput.value).toFixed(2);
+    }
     const store = dataStores.get(layer.dataStoreId);
     if (store) {
         lastFile = store.file;
@@ -2533,9 +2557,15 @@ function applyExtrusionWithCustomColors() {
             ? buildCategoricalColorExpression()
             : buildNumericColorExpression();
 
+        const activeLayer = getCurrentLayer();
         if (currentGeometryType === 'point') {
-            map.setPaintProperty(ids.layerId, 'circle-color', colorExpr);
-            map.setPaintProperty(ids.layerId, 'circle-opacity', parseFloat(opacityInput.value));
+            if (activeLayer?.isFloodStyle) {
+                map.setPaintProperty(ids.layerId, 'icon-color', colorExpr);
+                map.setPaintProperty(ids.layerId, 'icon-opacity', activeLayer.opacity);
+            } else {
+                map.setPaintProperty(ids.layerId, 'circle-color', colorExpr);
+                map.setPaintProperty(ids.layerId, 'circle-opacity', parseFloat(opacityInput.value));
+            }
         } else if (currentGeometryType === 'line') {
             map.setPaintProperty(ids.layerId, 'line-color', colorExpr);
             map.setPaintProperty(ids.layerId, 'line-opacity', parseFloat(opacityInput.value));
@@ -2950,68 +2980,13 @@ function installWelcome() {
     const card = document.createElement('div');
     card.style.cssText = 'background:#fff;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.12);padding:18px 20px;max-width:560px;width:min(92vw,560px);display:grid;gap:12px;text-align:center;';
     card.innerHTML = `
-    <div style="font-size:16px;font-weight:600;">Explore GIS Data</div>
-    <div style="color:#666;font-size:13px;">Choose a dataset below or drop a folder containing <code>.parquet</code> files here.</div>
+    <div style="font-size:16px;font-weight:600;">Loading GIS Data...</div>
     <div style="margin: 8px 0;">
         <a href="../explorer.html" style="color: #3b82f6; text-decoration: none; font-weight: 600; border: 1px solid #3b82f6; padding: 6px 12px; border-radius: 6px; display: inline-block;">← Back to Gallery</a>
     </div>
-    <div id="welcome-datasets" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:10px 0;">
-        <div class="muted">Loading available datasets...</div>
-    </div>
-    <div class="divider"></div>
-    <div style="color:#888;font-size:11px;">TIP: Parcels should have Polygon/MultiPolygon geometry.</div>
   `;
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:10px;justify-content:center;flex-wrap:wrap';
-
-    const btnBrowse = document.createElement('button');
-    btnBrowse.textContent = 'Browse for folder…';
-    btnBrowse.style.cssText = 'border:1px solid #ddd;background:#f8f8f8;padding:8px 12px;border-radius:10px;cursor:pointer;';
-    btnBrowse.onclick = () => fileInput.click();
-
-    row.append(btnBrowse);
-    card.append(row);
     welcomeEl.append(card);
     document.body.append(welcomeEl);
-
-    // Fetch datasets manifest
-    const manifestPaths = ['./data/datasets.json', './public/data/datasets.json'];
-    let manifestLoaded = false;
-
-    async function tryFetchManifest() {
-        const container = document.getElementById('welcome-datasets');
-        if (!container) return;
-
-        for (const path of manifestPaths) {
-            try {
-                const res = await fetch(path);
-                if (res.ok) {
-                    const manifest = await res.json();
-                    container.innerHTML = '';
-                    if (Array.isArray(manifest)) {
-                        manifest.forEach(item => {
-                            const btn = document.createElement('button');
-                            btn.textContent = (item.type === 'folder' ? '📂 ' : '📄 ') + (item.name.replace('.parquet', '').replace('.geoparquet', ''));
-                            btn.style.cssText = 'border:1px solid #3b82f6;background:#eff6ff;color:#1e40af;padding:8px 16px;border-radius:10px;cursor:pointer;font-weight:600;transition:all 0.2s;';
-                            btn.onmouseover = () => { btn.style.background = '#dbeafe'; };
-                            btn.onmouseout = () => { btn.style.background = '#eff6ff'; };
-                            btn.onclick = () => loadRemoteDataset(item);
-                            container.appendChild(btn);
-                        });
-                        manifestLoaded = true;
-                        console.log('Manifest loaded from:', path);
-                        break;
-                    }
-                }
-            } catch (e) { }
-        }
-
-        if (!manifestLoaded) {
-            container.innerHTML = '<div class="muted">Datasets manifest not found. Run build script first.</div>';
-        }
-    }
-
-    tryFetchManifest();
 }
 
 function revealUI() {
@@ -3698,16 +3673,40 @@ let keyHandlersInstalled = false;
 
 function addCircleLayer(layer: LayerState) {
     if (map.getLayer(layer.layerId)) return;
-    map.addLayer({
-        id: layer.layerId, type: 'circle', source: layer.sourceId,
-        paint: {
-            'circle-color': '#888',
-            'circle-radius': 6,
-            'circle-opacity': parseFloat(opacityInput.value),
-            'circle-stroke-width': 1,
-            'circle-stroke-color': '#fff'
-        }
-    });
+    
+    if (layer.isFloodStyle) {
+        // Render as SQUARES using symbols
+        map.addLayer({
+            id: layer.layerId, type: 'symbol', source: layer.sourceId,
+            layout: {
+                'icon-image': 'white-square',
+                'icon-size': [
+                    'interpolate', ['linear'], ['zoom'],
+                    10, 0.1,
+                    15, 0.4,
+                    20, 1.0
+                ],
+                'icon-allow-overlap': true,
+                'icon-ignore-placement': true
+            },
+            paint: {
+                'icon-color': '#888',
+                'icon-opacity': layer.opacity
+            }
+        });
+    } else {
+        // Normal circles
+        map.addLayer({
+            id: layer.layerId, type: 'circle', source: layer.sourceId,
+            paint: {
+                'circle-color': '#888',
+                'circle-radius': 6,
+                'circle-opacity': layer.opacity,
+                'circle-stroke-width': 1,
+                'circle-stroke-color': '#fff'
+            }
+        });
+    }
     setLayerVisibility(layer, layer.visible);
     _installLayerEventHandlers(layer);
 }
@@ -3938,13 +3937,28 @@ function applyExtrusion() {
         return;
     }
 
+    const activeLayer = getCurrentLayer();
     if (currentGeometryType === 'point') {
         // --- POINT layer ---
-        const colorExpr = currentFieldType === 'categorical'
-            ? buildCategoricalColorExpression()
-            : buildNumericColorExpression();
-        map.setPaintProperty(ids.layerId, 'circle-color', colorExpr);
-        map.setPaintProperty(ids.layerId, 'circle-opacity', parseFloat(opacityInput.value));
+        if (currentFieldType === 'categorical') {
+            const colorExpr = buildCategoricalColorExpression();
+            if (activeLayer?.isFloodStyle) {
+                map.setPaintProperty(ids.layerId, 'icon-color', colorExpr);
+                map.setPaintProperty(ids.layerId, 'icon-opacity', activeLayer.opacity);
+            } else {
+                map.setPaintProperty(ids.layerId, 'circle-color', colorExpr);
+                map.setPaintProperty(ids.layerId, 'circle-opacity', parseFloat(opacityInput.value));
+            }
+        } else {
+            const colorExpr = buildNumericColorExpression();
+            if (activeLayer?.isFloodStyle) {
+                map.setPaintProperty(ids.layerId, 'icon-color', colorExpr);
+                map.setPaintProperty(ids.layerId, 'icon-opacity', activeLayer.opacity);
+            } else {
+                map.setPaintProperty(ids.layerId, 'circle-color', colorExpr);
+                map.setPaintProperty(ids.layerId, 'circle-opacity', parseFloat(opacityInput.value));
+            }
+        }
     } else if (currentGeometryType === 'line') {
         // --- LINE layer ---
         const colorExpr = currentFieldType === 'categorical'
@@ -4775,18 +4789,25 @@ window.addEventListener('drop', async (e) => {
     const files: File[] = [];
 
     // Helper functions to traverse entries
-    async function traverseEntry(entry: any) {
+    async function traverseEntry(entry: any, folderName?: string) {
         if (entry.isFile) {
             const file = await new Promise<File>((resolve) => entry.file(resolve));
             const lower = file.name.toLowerCase();
             if (lower.endsWith('.parquet') || lower.endsWith('.parq') || lower.endsWith('.geoparquet')) {
-                files.push(file);
+                // If the folder name contains _2d, inject it into the filename for detection
+                if (folderName && folderName.toLowerCase().includes('_2d') && !lower.includes('_2d')) {
+                    const blob = file.slice(0, file.size, file.type);
+                    const newFile = new File([blob], `${folderName}_${file.name}`, { type: file.type });
+                    files.push(newFile);
+                } else {
+                    files.push(file);
+                }
             }
         } else if (entry.isDirectory) {
             const reader = entry.createReader();
             const entries = await new Promise<any[]>((resolve) => reader.readEntries(resolve));
             for (const child of entries) {
-                await traverseEntry(child);
+                await traverseEntry(child, folderName || entry.name);
             }
         }
     }

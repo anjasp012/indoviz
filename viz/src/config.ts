@@ -20,7 +20,10 @@ export const COLOR_RAMPS: Record<string, string[]> = {
     Turbo: ['#30123B', '#4145AB', '#2CC0F0', '#6AE4B4', '#C6F86D', '#F9DD32', '#F28C21', '#CB3E1F', '#8A0D2C'],
     YlOrRd: ['#FFFFB2', '#FECC5C', '#FD8D3C', '#F03B20', '#BD0026'],
     Blues: ['#DEEBF7', '#9ECAE1', '#6BAED6', '#3182BD', '#08519C'],
-    Civic: ['#1b5e20', '#43a047', '#9ccc65', '#fdd835', '#fb8c00', '#e53935', '#8e24aa', '#3949ab']
+    Civic: ['#1b5e20', '#43a047', '#9ccc65', '#fdd835', '#fb8c00', '#e53935', '#8e24aa', '#3949ab'],
+    Divergent: ['#a50026', '#d73027', '#f46d43', '#fdae61', '#fee08b', '#ffffbf', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850', '#006837'],
+    Flood: ['#B22222', '#FF8C00', '#FFFACD', '#90EE90', '#228B22'],
+    Mobility: ['#E6F2FF', '#99CCFF', '#3399FF', '#0080FF', '#004C99']
 };
 
 // Unit conversion (unchanged)

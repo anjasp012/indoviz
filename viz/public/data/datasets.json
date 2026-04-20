@@ -9,21 +9,24 @@
       "mobility_2d/dike.parquet",
       "mobility_2d/mobility_pt.parquet",
       "mobility_2d/mobility_line.parquet"
-    ]
+    ],
+    "thumbnail": "viz/data/mobility_2d/thumbnail.png"
   },
   {
     "type": "folder",
     "name": "babakan_3d",
     "files": [
       "babakan_3d/babakan_ciparay.parquet"
-    ]
+    ],
+    "thumbnail": "viz/data/babakan_3d/thumbnail.png"
   },
   {
     "type": "folder",
     "name": "gwr_2d",
     "files": [
       "gwr_2d/flood.parquet"
-    ]
+    ],
+    "thumbnail": "viz/data/gwr_2d/thumbnail.png"
   },
   {
     "type": "folder",
@@ -31,7 +34,8 @@
     "files": [
       "submarket_2d/flood.parquet",
       "submarket_2d/submarkets.parquet"
-    ]
+    ],
+    "thumbnail": "viz/data/submarket_2d/thumbnail.png"
   },
   {
     "type": "folder",
@@ -41,6 +45,7 @@
       "flood_2d/landsub.parquet",
       "flood_2d/pump.parquet",
       "flood_2d/dike.parquet"
-    ]
+    ],
+    "thumbnail": "viz/data/flood_2d/thumbnail.png"
   }
 ]
